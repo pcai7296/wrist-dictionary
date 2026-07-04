@@ -1,0 +1,12 @@
+/.nyc_output
+/coverage
+/node_modules
+/sign
+/dist
+/build
+.husky/
+/src/common/dict/
+/.codegraph/
+/.omo/
+/.tmp/
+/opencode.json.bak*

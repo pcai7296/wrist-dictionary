@@ -1,0 +1,309 @@
+<template>
+  <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="back-pill" @click="goBack">
+      <text class="back-mark">&lt;</text>
+    </div>
+
+    <list class="record-list" if="{{ records.length > 0 }}">
+      <list-item class="record-item" type="recordCard" for="{{ item in records }}" tid="id">
+        <div class="record-card" @click="openRecord(item)">
+          <text class="record-title">{{ item.title }}</text>
+          <div class="record-bottom">
+            <text class="record-desc">{{ item.shortTranslation }}</text>
+            <text class="record-meta">{{ item.metaText }}</text>
+          </div>
+        </div>
+      </list-item>
+    </list>
+
+    <text class="empty-text" if="{{ records.length == 0 }}">{{ emptyText }}</text>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import storage from "@system.storage"
+
+export default {
+  protected: {
+    type: ""
+  },
+
+  private: {
+    records: [],
+    emptyText: "",
+    touchStartX: -1,
+    touchStartY: -1
+  },
+
+  onInit() {
+    this.loadRecords()
+  },
+
+  onShow() {
+    this.loadRecords()
+  },
+
+  goBack() {
+    router.back()
+  },
+
+  loadRecords() {
+    const key = this.getStorageKey()
+    this.emptyText = this.type === "favorites" ? "暂无收藏" : "暂无历史"
+    storage.get({
+      key: key,
+      success: (data) => {
+        this.records = this.buildRecords(this.parseList(data))
+      },
+      fail: () => {
+        this.records = []
+      }
+    })
+  },
+
+  openRecord(item) {
+    if (!item) {
+      return
+    }
+    if (this.type === "history") {
+      router.replace({
+        uri: "/pages/search",
+        params: {
+          queryParam: item.query || "",
+          autoSearch: "1"
+        }
+      })
+      return
+    }
+    if (!item.word) {
+      return
+    }
+    router.push({
+      uri: "/pages/detail",
+      params: {
+        word: item.word,
+        phonetic: item.phonetic || "",
+        translation: item.translation || "",
+        tag: item.tag || ""
+      }
+    })
+  },
+
+  getStorageKey() {
+    if (this.type === "favorites") {
+      return "dic_favorites"
+    }
+    return "dic_history"
+  },
+
+  buildRecords(list) {
+    const output = []
+    for (let i = 0; i < list.length && output.length < 20; i++) {
+      const item = list[i]
+      if (!item) {
+        continue
+      }
+      if (this.type === "history") {
+        if (!item.query) {
+          continue
+        }
+        output.push({
+          id: this.normalizeWord(item.query) + "_" + i,
+          title: item.query,
+          query: item.query,
+          shortTranslation: "搜索词",
+          metaText: "" + (i + 1)
+        })
+      } else {
+        if (!item.word) {
+          continue
+        }
+        output.push({
+          id: this.normalizeWord(item.word) + "_" + i,
+          title: item.word,
+          word: item.word,
+          phonetic: item.phonetic || "",
+          translation: item.translation || "",
+          tag: item.tag || "",
+          shortTranslation: this.clipText(item.translation || "", 16),
+          metaText: this.buildMetaText(item.tag || "", i)
+        })
+      }
+    }
+    return output
+  },
+
+  buildMetaText(tag, index) {
+    if (tag) {
+      return this.clipText(tag, 5)
+    }
+    return "" + (index + 1)
+  },
+
+  clipText(value, maxLen) {
+    const text = (value || "").replace(/\s+/g, " ").trim()
+    if (text.length <= maxLen) {
+      return text
+    }
+    return text.slice(0, maxLen) + "..."
+  },
+
+  parseList(data) {
+    if (!data) {
+      return []
+    }
+    const text = data.value ? data.value : data
+    try {
+      const list = JSON.parse(text)
+      if (list && list.length) {
+        return list
+      }
+    } catch (err) {
+      return []
+    }
+    return []
+  },
+
+  normalizeWord(value) {
+    return (value || "").toLowerCase().trim()
+  },
+
+  onTouchStart(evt) {
+    const point = this.getTouchPoint(evt)
+    if (point) {
+      this.touchStartX = point.clientX
+      this.touchStartY = point.clientY
+    }
+  },
+
+  onTouchEnd(evt) {
+    const point = this.getTouchPoint(evt)
+    if (!point || this.touchStartX < 0) {
+      return
+    }
+
+    const endX = point.clientX
+    const endY = point.clientY
+    const startsInLeftQuarter = this.touchStartX <= 53
+    const endsAtRightQuarter = endX >= 159
+    const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
+
+    if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
+      router.back()
+    }
+
+    this.touchStartX = -1
+    this.touchStartY = -1
+  },
+
+  getTouchPoint(evt) {
+    if (evt && evt.changedTouches && evt.changedTouches.length > 0) {
+      return evt.changedTouches[0]
+    }
+    if (evt && evt.touches && evt.touches.length > 0) {
+      return evt.touches[0]
+    }
+    return null
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 100%;
+  height: 520px;
+  padding-top: 8px;
+  background-color: #020813;
+  flex-direction: column;
+  align-items: center;
+}
+
+.back-pill {
+  width: 78px;
+  height: 72px;
+  margin-bottom: 8px;
+  border-radius: 36px;
+  border-width: 2px;
+  border-color: #333333;
+  background-color: #242424;
+  justify-content: center;
+  align-items: center;
+}
+
+.back-mark {
+  width: 48px;
+  height: 38px;
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.record-list {
+  width: 190px;
+  height: 426px;
+}
+
+.record-item {
+  width: 190px;
+  height: 110px;
+}
+
+.record-card {
+  width: 190px;
+  height: 100px;
+  margin-bottom: 10px;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-top: 12px;
+  border-radius: 20px;
+  background-color: #242424;
+  flex-direction: column;
+}
+
+.record-title {
+  width: 166px;
+  height: 42px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.record-bottom {
+  width: 166px;
+  height: 34px;
+  margin-top: 3px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.record-desc {
+  width: 112px;
+  height: 32px;
+  color: #aeb0b4;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.record-meta {
+  width: 48px;
+  height: 32px;
+  color: #aeb0b4;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.empty-text {
+  width: 168px;
+  height: 40px;
+  margin-top: 120px;
+  color: #aeb0b4;
+  font-size: 22px;
+  text-align: center;
+}
+</style>

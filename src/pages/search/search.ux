@@ -1,0 +1,319 @@
+<import name="input-method" src="../../components/InputMethod/InputMethod.ux"></import>
+
+<template>
+  <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="search-button" @click="performSearch">
+      <img class="search-icon" src="/common/search-icon.png" />
+    </div>
+
+    <div class="input-box" @click="toggleKeyboard">
+      <text class="input-text">{{ displayText }}</text>
+    </div>
+
+    <div class="edit-row">
+      <input class="edit-button side-button" type="button" value="<" @click="moveLeft" />
+      <input class="edit-button clear-button" type="button" value="清空" @click="clearText" />
+      <input class="edit-button side-button" type="button" value=">" @click="moveRight" />
+    </div>
+
+    <input-method
+      hide="{{ keyboardHidden }}"
+      keyboardtype="{{ keyboardType }}"
+      maxlength="24"
+      vibratemode="{{ vibrateMode }}"
+      screentype="{{ screenType }}"
+      @visibility-change="onVisibilityChange"
+      @key-down="onKeyDown"
+      @delete="onDelete"
+      @complete="onComplete"
+    ></input-method>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import storage from "@system.storage"
+
+export default {
+  protected: {
+    queryParam: "",
+    autoSearch: ""
+  },
+
+  private: {
+    query: "",
+    cursorIndex: 0,
+    displayText: "",
+    keyboardHidden: false,
+    keyboardType: "QWERTY",
+    vibrateMode: "short",
+    screenType: "pill-shaped",
+    touchStartX: -1,
+    touchStartY: -1
+  },
+
+  onInit() {
+    if (this.queryParam) {
+      this.query = this.queryParam
+      this.cursorIndex = this.query.length
+    }
+    this.keyboardHidden = this.autoSearch === "1" ? true : false
+    this.refreshDisplay()
+    if (this.autoSearch === "1" && this.query) {
+      this.performSearch()
+    }
+  },
+
+  toggleKeyboard() {
+    this.keyboardHidden = !this.keyboardHidden
+    this.refreshDisplay()
+  },
+
+  onVisibilityChange(evt) {
+    if (evt && evt.detail) {
+      this.keyboardHidden = !evt.detail.visible
+    }
+    this.refreshDisplay()
+  },
+
+  onKeyDown(evt) {
+    console.log("key down: " + JSON.stringify(evt))
+  },
+
+  onDelete() {
+    if (this.cursorIndex > 0) {
+      this.query = this.query.slice(0, this.cursorIndex - 1) + this.query.slice(this.cursorIndex)
+      this.cursorIndex--
+    }
+    this.refreshDisplay()
+  },
+
+  onComplete(evt) {
+    if (evt && evt.detail && evt.detail.content) {
+      const content = evt.detail.content
+      this.query = this.query.slice(0, this.cursorIndex) + content + this.query.slice(this.cursorIndex)
+      this.cursorIndex += content.length
+    }
+    this.refreshDisplay()
+  },
+
+  clearText() {
+    this.query = ""
+    this.cursorIndex = 0
+    this.refreshDisplay()
+  },
+
+  moveLeft() {
+    if (this.cursorIndex > 0) {
+      this.cursorIndex--
+    }
+    this.refreshDisplay()
+  },
+
+  moveRight() {
+    if (this.cursorIndex < this.query.length) {
+      this.cursorIndex++
+    }
+    this.refreshDisplay()
+  },
+
+  performSearch() {
+    const normalized = this.normalizeWord(this.query)
+    this.keyboardHidden = true
+    this.refreshDisplay()
+
+    if (!normalized) {
+      return
+    }
+
+    this.saveSearchHistory(normalized)
+
+    router.push({
+      uri: "/pages/results",
+      params: {
+        query: normalized
+      }
+    })
+  },
+
+  saveSearchHistory(query) {
+    const item = {
+      query: query
+    }
+    storage.get({
+      key: "dic_history",
+      success: (data) => {
+        const list = this.parseList(data)
+        this.writeHistoryList(list, item)
+      },
+      fail: () => {
+        this.writeHistoryList([], item)
+      }
+    })
+  },
+
+  writeHistoryList(list, item) {
+    const output = [item]
+    for (let i = 0; i < list.length && output.length < 20; i++) {
+      const oldItem = list[i]
+      if (oldItem && oldItem.query && this.normalizeWord(oldItem.query) !== item.query) {
+        output.push(oldItem)
+      }
+    }
+    storage.set({
+      key: "dic_history",
+      value: JSON.stringify(output)
+    })
+  },
+
+  parseList(data) {
+    if (!data) {
+      return []
+    }
+    const text = data.value ? data.value : data
+    try {
+      const list = JSON.parse(text)
+      if (list && list.length) {
+        return list
+      }
+    } catch (err) {
+      return []
+    }
+    return []
+  },
+
+  onTouchStart(evt) {
+    const point = this.getTouchPoint(evt)
+    if (point) {
+      this.touchStartX = point.clientX
+      this.touchStartY = point.clientY
+    }
+  },
+
+  onTouchEnd(evt) {
+    const point = this.getTouchPoint(evt)
+    if (!point || this.touchStartX < 0) {
+      return
+    }
+
+    const endX = point.clientX
+    const endY = point.clientY
+    const startsInLeftQuarter = this.touchStartX <= 53
+    const endsAtRightQuarter = endX >= 159
+    const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
+
+    if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
+      router.back()
+    }
+
+    this.touchStartX = -1
+    this.touchStartY = -1
+  },
+
+  getTouchPoint(evt) {
+    if (evt && evt.changedTouches && evt.changedTouches.length > 0) {
+      return evt.changedTouches[0]
+    }
+    if (evt && evt.touches && evt.touches.length > 0) {
+      return evt.touches[0]
+    }
+    return null
+  },
+
+  refreshDisplay() {
+    if (!this.query) {
+      this.cursorIndex = 0
+      this.displayText = ""
+      return
+    }
+
+    if (this.cursorIndex < 0) {
+      this.cursorIndex = 0
+    }
+    if (this.cursorIndex > this.query.length) {
+      this.cursorIndex = this.query.length
+    }
+
+    this.displayText = this.query.slice(0, this.cursorIndex) + (this.keyboardHidden ? "" : "_") + this.query.slice(this.cursorIndex)
+  },
+
+  normalizeWord(value) {
+    return (value || "").toLowerCase().trim()
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 100%;
+  height: 520px;
+  padding-top: 24px;
+  background-color: #020813;
+  flex-direction: column;
+  align-items: center;
+}
+
+.search-button {
+  width: 78px;
+  height: 54px;
+  border-radius: 22px;
+  background-color: #0b65ea;
+  justify-content: center;
+  align-items: center;
+}
+
+.search-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.input-box {
+  width: 168px;
+  height: 52px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-width: 2px;
+  border-color: #2f8cff;
+  border-radius: 18px;
+  background-color: #08172b;
+  justify-content: center;
+}
+
+.input-text {
+  width: 140px;
+  height: 36px;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.edit-row {
+  width: 168px;
+  height: 42px;
+  margin-bottom: 6px;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.edit-button {
+  height: 42px;
+  border-radius: 18px;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.side-button {
+  width: 48px;
+  background-color: #0b65ea;
+}
+
+.clear-button {
+  width: 62px;
+  background-color: #d82626;
+}
+</style>

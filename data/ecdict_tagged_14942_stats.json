@@ -1,0 +1,26 @@
+{
+  "source": "skywind3000/ECDICT ecdict.csv",
+  "source_blob_sha": "c4ade63ea08cf39d9c3475e96929036d64d94c94",
+  "source_csv_size": 65933428,
+  "tagged_rows": 14942,
+  "unique_headwords": 14942,
+  "exchange_values_total": 31190,
+  "unique_exchange_forms": 21485,
+  "unique_exchange_forms_not_headwords": 19619,
+  "union_headwords_plus_forms": 34561,
+  "tag_counts": {
+    "cet4": 3849,
+    "cet6": 5407,
+    "gk": 3677,
+    "gre": 7504,
+    "ielts": 5040,
+    "ky": 4801,
+    "toefl": 6974,
+    "zk": 1603
+  },
+  "files": {
+    "full_csv": "J:\\code\\MI band\\wanshanghonghuang\\腕上词典\\data\\ecdict_tagged_14942_full.csv",
+    "compact_csv": "J:\\code\\MI band\\wanshanghonghuang\\腕上词典\\data\\ecdict_tagged_14942_compact.csv",
+    "compact_json": "J:\\code\\MI band\\wanshanghonghuang\\腕上词典\\data\\ecdict_tagged_14942_compact.json"
+  }
+}
