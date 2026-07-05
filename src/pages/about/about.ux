@@ -4,30 +4,63 @@
       <text class="back-mark">返回</text>
     </div>
 
-    <div class="app-card">
-      <text class="app-name">腕上词典</text>
-      <text class="app-version">1.0</text>
-      <div class="mini-icon">
-        <div class="mini-left">
-          <div class="mini-line short"></div>
-          <div class="mini-line"></div>
+    <list class="about-list">
+      <list-item type="card" class="list-item" style="height: 210px;">
+        <div class="app-card">
+          <text class="app-name">腕上词典</text>
+          <text class="app-version">1.0</text>
+          <div class="mini-icon">
+            <div class="mini-left">
+              <div class="mini-line short"></div>
+              <div class="mini-line"></div>
+            </div>
+            <div class="mini-right">
+              <div class="mini-mark"></div>
+              <div class="mini-line right-line"></div>
+            </div>
+          </div>
         </div>
-        <div class="mini-right">
-          <div class="mini-mark"></div>
-          <div class="mini-line right-line"></div>
+      </list-item>
+
+      <list-item type="devs" class="list-item" style="height: 170px;">
+        <div class="section-inner">
+          <text class="section-title">Developers</text>
+          <text class="dev-role">开发</text>
+          <text class="dev-name">@睡不着的鸿鹄</text>
+          <text class="dev-role">UI设计参考</text>
+          <text class="dev-name">@无源流沙</text>
         </div>
-      </div>
-    </div>
+      </list-item>
 
-    <text class="section-title">Developers</text>
-    <text class="dev-role">开发</text>
-    <text class="dev-name">@睡不着的鸿鹄</text>
-    <text class="dev-role">UI设计参考</text>
-    <text class="dev-name">@无源流沙</text>
+      <list-item type="license" class="list-item" style="height: 110px;">
+        <div class="section-inner">
+          <text class="section-title">词库来源</text>
+          <text class="license-line">ECDICT / MIT</text>
+          <text class="license-line">BNC/COCA 词族表</text>
+        </div>
+      </list-item>
 
-    <text class="license-title">词库来源</text>
-    <text class="license-line">ECDICT / MIT</text>
-    <text class="license-line">BNC/COCA 词族表</text>
+      <list-item type="usage" class="list-item" style="height: 400px;">
+        <div class="section-inner">
+          <text class="section-title">使用说明</text>
+          <text class="desc-line">1. 首页选择"查找变形"查询单词的形态变化</text>
+          <text class="desc-line">2. "中英查找"直接搜索英文或中文单词</text>
+          <text class="desc-line">3. 点击结果卡片查看详细释义和变形</text>
+          <text class="desc-line">4. 搜索历史自动保存，可随时查看</text>
+          <text class="desc-line">5. 单词详情页可添加到收藏</text>
+        </div>
+      </list-item>
+
+      <list-item type="limits" class="list-item" style="height: 320px;">
+        <div class="section-inner">
+          <text class="section-title">使用限制</text>
+          <text class="desc-line">• 本地词库约15,000词，专业词汇可能未收录</text>
+          <text class="desc-line">• 每次搜索最多显示20条结果</text>
+          <text class="desc-line">• 中文搜索仅支持单字索引，长句效果有限</text>
+          <text class="desc-line">• 首次使用需等待词库加载</text>
+        </div>
+      </list-item>
+    </list>
   </div>
 </template>
 
@@ -60,9 +93,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
-    const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
+    const startsInLeftQuarter = this.touchStartX <= 20
+    const endsAtRightQuarter = endX >= 180
+    const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 60
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
       router.back()
@@ -100,8 +133,8 @@ export default {
   margin-bottom: 10px;
   border-radius: 36px;
   border-width: 2px;
-  border-color: #333333;
-  background-color: #242424;
+  border-color: #2f8cff;
+  background-color: #08172b;
   justify-content: center;
   align-items: center;
 }
@@ -113,6 +146,23 @@ export default {
   font-size: 22px;
   font-weight: 800;
   text-align: center;
+}
+
+.about-list {
+  width: 196px;
+  height: 410px;
+}
+
+.list-item {
+  width: 196px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.section-inner {
+  width: 196px;
+  flex-direction: column;
+  align-items: center;
 }
 
 .app-card {
@@ -201,46 +251,46 @@ export default {
 }
 
 .section-title {
-  width: 188px;
+  width: 180px;
   height: 38px;
   margin-top: 14px;
   color: #aeb0b4;
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 700;
   text-align: left;
 }
 
 .dev-role {
-  width: 188px;
+  width: 180px;
   height: 24px;
   color: #ffffff;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   text-align: center;
 }
 
 .dev-name {
-  width: 188px;
-  height: 30px;
+  width: 180px;
+  height: 28px;
   color: #ffffff;
-  font-size: 20px;
-  text-align: center;
-}
-
-.license-title {
-  width: 188px;
-  height: 24px;
-  margin-top: 4px;
-  color: #aeb0b4;
   font-size: 18px;
   text-align: center;
 }
 
 .license-line {
-  width: 188px;
+  width: 180px;
   height: 22px;
   color: #ffffff;
-  font-size: 17px;
+  font-size: 18px;
   text-align: center;
+}
+
+.desc-line {
+  width: 180px;
+  height: auto;
+  margin-top: 6px;
+  color: #ffffff;
+  font-size: 18px;
+  text-align: left;
 }
 </style>
