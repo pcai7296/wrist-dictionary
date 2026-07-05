@@ -1,7 +1,7 @@
 <template>
   <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="back-pill" @click="goBack">
-      <text class="back-mark">&lt;</text>
+      <text class="back-mark">返回</text>
     </div>
 
     <list class="record-list" if="{{ records.length > 0 }}">
@@ -232,10 +232,10 @@ export default {
 }
 
 .back-mark {
-  width: 48px;
-  height: 38px;
+  width: 64px;
+  height: 30px;
   color: #ffffff;
-  font-size: 36px;
+  font-size: 22px;
   font-weight: 800;
   text-align: center;
 }

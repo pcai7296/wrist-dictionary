@@ -23,13 +23,17 @@
 <script>
 import router from "@system.router"
 import storage from "@system.storage"
+import file from "@system.file"
+import prompt from "@system.prompt"
 
 export default {
   protected: {
     word: "",
     phonetic: "",
     translation: "",
-    tag: ""
+    tag: "",
+    searchMode: "",
+    inflectDepth: ""
   },
 
   private: {
@@ -39,6 +43,14 @@ export default {
     tagText: "",
     translationLines: [],
     favoriteLabel: "收藏",
+    fileCache: {},
+    sourceWord: "",
+    inflectForms: [],
+    lastToastAt: 0,
+    toastCooldown: 1500,
+    lastInflectAt: 0,
+    inflectPressCooldown: 1000,
+    maxInflectDepth: 3,
     touchStartX: -1,
     touchStartY: -1
   },
@@ -48,7 +60,7 @@ export default {
     this.phoneticText = this.phonetic ? "/" + this.phonetic + "/" : ""
     this.translationText = this.translation || ""
     this.tagText = this.tag || ""
-    this.translationLines = this.wrapText(this.translationText, 168)
+    this.translationLines = this.wrapText(this.translationText, 164)
     if (this.translationLines.length === 0) {
       this.translationLines = [""]
     }
@@ -63,11 +75,61 @@ export default {
     if (!this.wordText) {
       return
     }
+
+    const now = Date.now()
+    if (now - this.lastInflectAt < this.inflectPressCooldown) {
+      this.showToast("操作太快")
+      return
+    }
+    this.lastInflectAt = now
+
+    const depth = this.currentInflectDepth()
+    if (depth >= this.maxInflectDepth) {
+      this.showToast("最多查三层")
+      return
+    }
+
+    router.replace({
+      uri: "/pages/results",
+      params: {
+        query: this.wordText,
+        searchMode: "inflect",
+        inflectDepth: "" + (depth + 1)
+      }
+    })
+  },
+
+  goInflectParam(queryWord) {
+    if (!queryWord) {
+      return
+    }
     router.push({
       uri: "/pages/results",
       params: {
-        query: this.wordText
+        query: queryWord,
+        searchMode: this.searchMode || "",
+        inflectDepth: this.inflectDepth || "0"
       }
+    })
+  },
+
+  currentInflectDepth() {
+    const depth = parseInt(this.inflectDepth)
+    if (isNaN(depth) || depth < 0) {
+      return 0
+    }
+    return depth
+  },
+
+  showToast(message) {
+    const now = Date.now()
+    if (now - this.lastToastAt < this.toastCooldown) {
+      return
+    }
+    this.lastToastAt = now
+    prompt.showToast({
+      message: message,
+      duration: 1500
     })
   },
 
@@ -227,25 +289,121 @@ export default {
       return 0
     }
     if (ch >= "\u4e00" && ch <= "\u9fff") {
-      return 13
+      return 15
     }
     if (ch >= "A" && ch <= "Z") {
-      return 8
+      return 9
     }
     if (ch >= "a" && ch <= "z") {
-      return 7
+      return 8
     }
     if (ch >= "0" && ch <= "9") {
-      return 7
+      return 8
     }
     if (ch === " " || ch === "." || ch === "," || ch === ";" || ch === ":" || ch === "/" || ch === "-") {
-      return 4
+      return 5
     }
-    return 8
+    return 9
   },
 
   normalizeWord(value) {
     return (value || "").toLowerCase().trim()
+  },
+
+  keyFor(value) {
+    const word = this.normalizeWord(value)
+    let key = ""
+    for (let i = 0; i < word.length && key.length < 2; i++) {
+      const ch = word.charAt(i)
+      if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) {
+        key += ch
+      } else {
+        key += "_"
+      }
+    }
+    while (key.length < 2) {
+      key += "_"
+    }
+    return key
+  },
+
+  readText(uri, done) {
+    if (this.fileCache[uri]) {
+      done(this.fileCache[uri])
+      return
+    }
+    file.readText({
+      uri: uri,
+      encoding: "utf-8",
+      success: (data) => {
+        const text = data && data.text ? data.text : ""
+        this.fileCache[uri] = text
+        done(text)
+      },
+      fail: () => {
+        this.fileCache[uri] = ""
+        done("")
+      }
+    })
+  },
+
+  scanForwardInflect(text, word) {
+    const lines = text.split("\n")
+    const lowerWord = this.normalizeWord(word)
+    for (let i = 0; i < lines.length; i++) {
+      const parts = lines[i].split("\t")
+      if (parts.length >= 2 && this.normalizeWord(parts[0]) === lowerWord) {
+        return parts[1].split(",").map((s) => s.trim()).filter((s) => s)
+      }
+    }
+    return []
+  },
+
+  scanReverseInflect(text, word) {
+    const lines = text.split("\n")
+    const lowerWord = this.normalizeWord(word)
+    for (let i = 0; i < lines.length; i++) {
+      const parts = lines[i].split("\t")
+      if (parts.length >= 2 && this.normalizeWord(parts[0]) === lowerWord) {
+        return parts[1].split(",").map((s) => s.trim()).filter((s) => s)
+      }
+    }
+    return []
+  },
+
+  loadInflectForms() {
+    const word = this.normalizeWord(this.wordText)
+    if (!word || word.length < 2) {
+      return
+    }
+
+    const shard = this.keyFor(word)
+    const self = this
+
+    this.readText("/common/dict/inflect/inflect_" + shard + ".txt", (text) => {
+      const bases = text ? self.scanForwardInflect(text, word) : []
+      if (bases.length > 0) {
+        self.loadReverseInflectForms(bases[0], word, true)
+        return
+      }
+      self.loadReverseInflectForms(word, word, false)
+    })
+  },
+
+  loadReverseInflectForms(base, currentWord, showSource) {
+    const revShard = this.keyFor(base)
+    this.readText("/common/dict/inflect_reverse/ireverse_" + revShard + ".txt", (revText) => {
+      if (!revText) {
+        return
+      }
+      const allForms = this.scanReverseInflect(revText, base)
+      if (allForms.length > 0) {
+        if (showSource) {
+          this.sourceWord = base
+        }
+        this.inflectForms = allForms.filter((f) => f !== currentWord).slice(0, 10)
+      }
+    })
   },
 
   onTouchStart(evt) {
@@ -334,29 +492,58 @@ export default {
   text-align: left;
 }
 
+.inflect-section {
+  width: 168px;
+  margin-top: 4px;
+  flex-direction: column;
+}
+
+.inflect-row {
+  width: 168px;
+  height: 20px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.inflect-label {
+  color: #a9c8f6;
+  font-size: 13px;
+  height: 20px;
+  margin-right: 4px;
+}
+
+.inflect-link {
+  color: #0b65ea;
+  font-size: 14px;
+  height: 20px;
+  margin-right: 8px;
+}
+
 .meaning-list {
   width: 188px;
-  height: 302px;
+  height: 286px;
   margin-top: 8px;
 }
 
 .meaning-item {
   width: 188px;
-  height: 22px;
+  height: 24px;
 }
 
 .meaning-line {
   width: 168px;
-  height: 22px;
+  height: 24px;
   margin-left: 10px;
   color: #e9f2ff;
-  font-size: 16px;
+  font-size: 18px;
+  lines: 1;
+  text-overflow: clip;
 }
 
 .bottom-row {
   width: 176px;
   height: 48px;
-  margin-top: 10px;
+  margin-top: 2px;
   flex-direction: row;
   justify-content: space-between;
 }

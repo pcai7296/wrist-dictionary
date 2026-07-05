@@ -6,32 +6,23 @@
         <!-- 全键盘 -->
 		<!-- 这里是480px圆表屏幕的键盘 -->
         <div id="full-keyboard" if="{{keyboardtype!='T9'}}" style="width: 480px;height: 321px;">
-          <img src="./assets/full/back2.png" style="position: absolute;top:38px;left:7px;width:466px;height:52px;" @click="onBtnClick('switchCn')" show="{{numFlag}}" />
-          <img src="./assets/full/123.png" style="position: absolute;top:266px;left:119px;width:120px;height:48px;" @click="onBtnClick('switchNum')" show="{{downFlag==='' && !numFlag && lang==='cn'}}" />
-          <img src="./assets/full/123.png" style="position: absolute;top:266px;left:119px;width:120px;height:48px;" @click="onBtnClick('switchNum_jp')" show="{{downFlag==='' && !numFlag && lang==='jp'}}" />
-          <img src="./assets/full/bigA.png" style="position: absolute;top:266px;left:119px;width:120px;height:48px;" @click="onBtnClick('switchLow')" show="{{downFlag==='' && upperFlag && lang==='en'}}" />
-          <img src="./assets/full/A.png" style="position: absolute;top:266px;left:119px;width:120px;height:48px;" @click="onBtnClick('switchUpper')" show="{{downFlag==='' && !upperFlag && lang==='en'}}" />
           <div style="position: absolute;top:38px;left:78px;width:324px;height:52px;background-color:rgb(38,38,38);border-radius: 12px;border: 3px solid #333333" show="{{downFlag===''&& !numFlag}}"></div>
           <img show="{{resultList.length > 0}}" style="position: absolute;top:43px;left:355px;" src="./assets/full/down.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
-          <img src="./assets/full/{{lang}}.png" style="position: absolute;top:38px;left:7px;width:67px;height:52px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag && lang!='jp'}}" />
-          <img src="./assets/full/jp.png" style="position: absolute;top:38px;left:7px;width:67px;height:52px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag && lang==='jp'}}" />
+          <img src="./assets/full/{{lang}}.png" style="position: absolute;top:38px;left:7px;width:67px;height:52px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag}}" />
           <div style="position: absolute;top:-4px;left:78px;width:324px;" show="{{downFlag==='' && !numFlag && cval}}">
             <text class="caltext" style="width:296px;"> {{cval}}_ </text>
           </div>
-          <div style="position: absolute;top:38px;left:80px;width:277px" show="{{(lang === 'cn' || lang === 'jp') && !numFlag}}">
+          <div style="position: absolute;top:38px;left:80px;width:277px" show="{{(lang === 'cn' || lang === 'en') && !numFlag}}">
             <div class="item column center" for="{{cvalList}}">
               <input show='{{resultList.length > $idx}}' class="calbtn0" type="button" value="{{resultList[$idx]}}" @click="onRsSelect(resultList[$idx])" />
             </div>
-          </div>
-          <div style="position: absolute;top:38px;left:80px;width:320px;height:52px;align-content: center;align-items: center;justify-content: center" show="{{downFlag==='' && !numFlag && lang==='en'}}" @click="onBtnClick('switchNum')" >
-            <img src="./assets/full/123_boardless.png" />
           </div>
           <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
           <list class="list3" if="{{downFlag==='down'}}">
             <list-item type="waitingRows62t9" class="item3" for="{{itemArray in resultList2}}">
               <div class="item column center" style="height:52px;" for="{{item in itemArray}}">
-                <input class="calbtn0" type="button" value="{{item}}" @click="onRsSelect(item)" />
+                <input class="calbtn0" style="width:100%;" type="button" value="{{item}}" @click="onRsSelect(item)" />
               </div>
             </list-item>
           </list>
@@ -77,10 +68,6 @@
         </div>
         <!-- 九键 -->
         <div else style="width: 480px;height: 321px;">
-          <img src="./assets/t9/back2.png" style="position: absolute;top:35px;left:31px;width: 60px;height: 60px;" @click="onBtnClick('switchCn')" show="{{numFlag}}" />
-          <img src="./assets/t9/123.png" style="position: absolute;top:99px;left:31px;width: 60px;height: 60px;" @click="onBtnClick('switchNum')" show="{{downFlag==='' && !numFlag && lang==='cn'}}" />
-          <img src="./assets/t9/bigA.png" style="position: absolute;top:99px;left:31px;width: 60px;height: 60px;" @click="onBtnClick('switchLow')" show="{{downFlag==='' && !numFlag && upperFlag && lang==='en'}}" />
-          <img src="./assets/t9/a.png" style="position: absolute;top:99px;left:31px;width: 60px;height: 60px;" @click="onBtnClick('switchUpper')" show="{{downFlag==='' && !numFlag && !upperFlag && lang==='en'}}" />
           <div style="position: absolute;top:35px;left:95px;width:290px;height:60px;background-color:rgb(38,38,38);border-radius: 999px;border: 3px solid #333333" show="{{downFlag===''&& !numFlag}}"></div>
           <img show="{{resultList.length > 0}}" style="position: absolute;top:44px;left:338px;" src="./assets/full/down.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
@@ -91,19 +78,16 @@
           <div show="{{downFlag==='' && !numFlag}}" style="position: absolute;top:-4px;left:240px;width:145px;height:40px;justify-content:flex-end">
             <text for="{{waitingList}}" class="waiting-keys" style="color:{{$idx===waitingIndex ? 'rgb(13,132,255)' : 'white'}};" @click="onSelectWaiting($idx)">{{waitingList[$idx]}}</text>
           </div>
-          <div style="position: absolute;top:39px;left:105px;width:233px" show="{{lang === 'cn' && !numFlag}}">
+          <div style="position: absolute;top:39px;left:105px;width:233px" show="{{(lang === 'cn' || lang === 'en') && !numFlag}}">
             <div class="item column center" for="{{cvalList}}">
               <input show='{{resultList.length > $idx}}' class="calbtn0" type="button" value="{{resultList[$idx]}}" @click="onRsSelect(resultList[$idx])" />
             </div>
-          </div>
-          <div style="position: absolute;top:35px;left:95px;width:290px;height:60px;align-content: center;align-items: center;justify-content: center" show="{{downFlag==='' && !numFlag && lang==='en'}}" @click="onBtnClick('switchNum')" >
-            <img src="./assets/full/123_boardless.png" />
           </div>
           <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
           <list class="list3" if="{{downFlag==='down'}}">
             <list-item type="waitingRows62full" class="item3" for="{{itemArray in resultList2}}">
               <div class="item column center" style="height:52px;" for="{{item in itemArray}}">
-                <input class="calbtn0" type="button" value="{{item}}" @click="onRsSelect(item)" />
+                <input class="calbtn0" style="width:100%;" type="button" value="{{item}}" @click="onRsSelect(item)" />
               </div>
             </list-item>
           </list>
@@ -205,8 +189,7 @@
         </div>
         <div style="width: 100%; flex-direction: row; justify-content: center; top:6px; padding:0 6px;">
           <img src="./assets/horizontal/cn.png" style="padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag && lang==='cn'}}" />
-          <img src="./assets/horizontal/jp.png" style="padding:6px;width:60px;height:60px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag && lang==='jp'}}" />
-          <div if="{{(lang === 'cn' || lang === 'jp') && !numFlag}}" style="margin-left: 6px;flex: 1;height: 60px;background-color:#262626;border-color: #333333; border-width: 3px; border-radius: 100px;flex-direction: row;align-items:center">
+          <div if="{{(lang === 'cn' || lang === 'en') && !numFlag}}" style="margin-left: 6px;flex: 1;height: 60px;background-color:#262626;border-color: #333333; border-width: 3px; border-radius: 100px;flex-direction: row;align-items:center">
             <scroll id="cvalWaiting" scroll-x="{{true}}" style="position:absolute;width: 85%;height: 42px;">
               <div static style="position: absolute;left: 0px;height: 42px;padding-left:20px;padding-right:20px">
                 <text class="calbtn02" style="padding-right:10px" @click="pushCval">{{cval}}</text>
@@ -215,13 +198,7 @@
             </scroll>
             <img if="{{resultList.length > 0}}" style="position:absolute;right: 8px; width: 60px;height: 40px;" src="./assets/horizontal/down2.png" @click="onBtnClick('down')" />
           </div>
-          <img src="./assets/horizontal/123.png" style="margin-left:6px;padding:6px;width:60px;height:60px;" @click="onBtnClick('switchNum_jp')" if="{{downFlag==='' && !numFlag && lang==='jp'}}" />
-        
           <img src="./assets/horizontal/en.png" style="padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag && lang==='en'}}" />
-          <img src="./assets/horizontal/bigA.png" style="padding: 6px;margin-left: 6px;width:94px;height:60px;" @click="onBtnClick('switchLow')" if="{{downFlag==='' && upperFlag && lang==='en'&& !numFlag}}" />
-          <img src="./assets/horizontal/a.png" style="padding: 6px;margin-left: 6px;width:94px;height:60px;" @click="onBtnClick('switchUpper')" if="{{downFlag==='' && !upperFlag && lang==='en'&& !numFlag}}" />
-          <img src="./assets/horizontal/123.png" style="margin-left: 6px;padding: 6px;margin-left: 6px;width: 94px;height: 60px;" @click="onBtnClick('switchNum')" if="{{downFlag==='' && !numFlag && lang==='en'}}" />
-          <img src="./assets/horizontal/back2.png" style="margin-left: 6px;padding: 6px;width: 159px;height: 60px;" @click="onBtnClick('switchCn')" if="{{numFlag}}" />
           <img if="{{!numFlag}}" src="./assets/horizontal/del.png" style="margin-left: 6px;padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('D')" />
           <img else src="./assets/horizontal/del2.png" style="margin-left: 6px;padding: 6px;" @click="onBtnClick('D')" />
         </div>
@@ -231,7 +208,7 @@
             <list static style="width:100%;height:100%;">
               <list-item type="waitingRows67" class="item67" for="{{itemArray in resultList2}}">
                 <div class="item column center" for="{{item in itemArray}}">
-                  <input class="calbtn02" type="button" value="{{item}}" @click="onRsSelect(item)" />
+                  <input class="calbtn02" style="width:100%;" type="button" value="{{item}}" @click="onRsSelect(item)" />
                 </div>
               </list-item>
             </list>
@@ -291,11 +268,6 @@
           <img show="{{resultList.length > 0}}" style="position: absolute;left: 120px;top: 57px;width: 60px;height: 40px;" src="./assets/arc/down2.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
           <img src="./assets/arc/{{lang}}.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('lang')" show="{{downFlag==='' && !numFlag && !numFlag_jp}}" />
-          <img src="./assets/arc/back2.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('switchCn')" show="{{numFlag && lang==='cn' ||numFlag_jp && lang==='jp' }}" />
-          <img src="./assets/arc/123.png" style="position: absolute;left: 70px;top: 0px;width: 52px;height: 42px;" @click="onBtnClick('switchNum')" show="{{downFlag==='' && !numFlag && lang==='cn'}}" />
-          <img src="./assets/arc/123.png" style="position: absolute;left: 70px;top: 0px;width: 52px;height: 42px;" @click="onBtnClick('switchNum_jp')" show="{{downFlag==='' && !numFlag_jp && lang==='jp'}}" />
-          <img src="./assets/arc/bigA.png" style="position: absolute;top:0px;left:72px;width:48px;height:42px;" @click="onBtnClick('switchLow')" show="{{downFlag==='' && upperFlag && lang==='en' }}" />
-          <img src="./assets/arc/a.png" style="position: absolute;top:0px;left:72px;width:48px;height:42px;" @click="onBtnClick('switchUpper')" show="{{downFlag==='' && !upperFlag && lang==='en' }}" />
           <img src="./assets/arc/del.png" style="position: absolute;left: 135px;top: 0px;width: 48px;height: 42px;" @click="onBtnClick('D')" />
         </div>
         <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
@@ -304,7 +276,7 @@
             <list static class="list66">
               <list-item type="waitingRows66" class="item66" for="{{itemArray in resultList2}}">
                 <div class="item column center" for="{{item in itemArray}}">
-                  <input class="calbtn0" type="button" value="{{item}}" @click="onRsSelect(item)" />
+                  <input class="calbtn0" style="width:100%;" type="button" value="{{item}}" @click="onRsSelect(item)" />
                 </div>
               </list-item>
             </list>
@@ -346,6 +318,12 @@ export default {
     },
     maxlength: {
       default: 5,
+    },
+    englishseed: {
+      default: "",
+    },
+    englishsuggestions: {
+      default: "",
     },
     vibratemode: {
       default: "",
@@ -411,6 +389,10 @@ export default {
     },
   },
   onInit() {
+    if (this.lang !== "cn" && this.lang !== "en") {
+      this.lang = "cn";
+      this.numFlag_jp = false;
+    }
     if (this.maxlength) {
       const tempCvalList = [];
       for (let i = 0; i < this.maxlength; i++) {
@@ -424,14 +406,24 @@ export default {
     this.$watch("hide", "watchHidePropsChange");
     this.$watch("maxlength", "watchMaxLengthPropsChange");
     this.$watch("keyboardtype", "watchKeyboardTypePropsChange");
+    this.$watch("englishseed", "watchEnglishSeedPropsChange");
+    this.$watch("englishsuggestions", "watchEnglishSuggestionsPropsChange");
   },
   addAllTxt(txt) {
     this.$emit("complete", { content: txt });
   },
   onRsSelect(txt) {
     this.onVibrate();
+    let content = txt;
+    if (this.lang === "en") {
+      const seed = this.normalizeEnglishSeed(this.englishseed);
+      const word = this.normalizeEnglishSeed(txt);
+      if (seed && word.indexOf(seed) === 0 && word.length > seed.length) {
+        content = word.slice(seed.length);
+      }
+    }
     this.cval = "";
-    this.addAllTxt(txt);
+    this.addAllTxt(content);
     this.clearWaiting();
     this.resetReslutList();
     this.downFlag = "";
@@ -445,17 +437,7 @@ export default {
         this.resetReslutList();
         break;
       case "lang":
-        if (this.keyboardtype === "T9") {
-          this.lang = this.lang === "cn" ? "en" : "cn";
-        } else {
-          if (this.lang === "cn") {
-            this.lang = "en";
-          } else if (this.lang === "en") {
-            this.lang = "jp";
-          } else {
-            this.lang = "cn";
-          }
-        }
+        this.lang = this.lang === "cn" ? "en" : "cn";
         this.cval = "";
         this.clearWaiting();
         this.resetReslutList();
@@ -479,29 +461,25 @@ export default {
         break;
       case "select":
         if (this.lastWaitingStr != sign && this.lastWaitingStr) {
-          if (this.lang === "cn" || this.lang === 'jp') {
+          if (this.lang === "cn") {
             this.cval += this.waitingList[this.waitingIndex];
           } else {
-            if (this.upperFlag) {
-              this.addAllTxt(this.waitingList[this.waitingIndex].toUpperCase());
-            } else {
-              this.addAllTxt(this.waitingList[this.waitingIndex].toLowerCase());
-            }
+            this.addAllTxt(this.waitingList[this.waitingIndex].toLowerCase());
           }
           this.clearWaiting();
           this.resetReslutList();
         }
         break;
       case "switchNum":
-        this.numFlag = true;
+        this.numFlag = false;
         this.numFlag_jp = false;
         this.cval = "";
         this.clearWaiting();
         this.resetReslutList();
         break;
       case "switchNum_jp":
-        this.numFlag = true;
-        this.numFlag_jp = true;
+        this.numFlag = false;
+        this.numFlag_jp = false;
         this.cval = "";
         this.clearWaiting();
         this.resetReslutList();
@@ -511,7 +489,7 @@ export default {
         this.numFlag_jp = false;
         break;
       case "switchUpper":
-        this.upperFlag = true;
+        this.upperFlag = false;
         break;
       case "switchLow":
         this.upperFlag = false;
@@ -527,18 +505,12 @@ export default {
                 this.waitingIndex = 0;
               }
             } else {
-              if (this.lang === "cn" || this.lang === 'jp') {
+              if (this.lang === "cn") {
                 this.cval += this.waitingList[this.waitingIndex];
               } else {
-                if (this.upperFlag) {
-                  this.addAllTxt(
-                    this.waitingList[this.waitingIndex].toUpperCase(),
-                  );
-                } else {
-                  this.addAllTxt(
-                    this.waitingList[this.waitingIndex].toLowerCase(),
-                  );
-                }
+                this.addAllTxt(
+                  this.waitingList[this.waitingIndex].toLowerCase(),
+                );
               }
               this.lastWaitingStr = sign;
               this.waitingIndex = 0;
@@ -564,7 +536,11 @@ export default {
     if (this.lastWaitingStr && this.lastWaitingStr[this.waitingIndex]) {
       watingStr = this.lastWaitingStr[this.waitingIndex];
     }
-    if (!(this.cval + watingStr) || (this.lang !== "cn" && this.lang !== "jp")) {
+    if (this.lang === "en") {
+      this.getEnglishResults(this.englishseed);
+      return;
+    }
+    if (!(this.cval + watingStr) || this.lang !== "cn") {
       this.resultList = [];
       this.setResultListAll();
       return;
@@ -574,14 +550,15 @@ export default {
   setResultListAll() {
     this.resultList2 = [];
     let array = [];
+    const rowSize = this.lang === "en" ? 1 : parseInt(this.maxlength);
     for (let i = 0; i < this.resultList.length; i++) {
       array.push(this.resultList[i]);
-      if (array.length === parseInt(this.maxlength)) {
+      if (array.length === rowSize) {
         this.resultList2.push(array);
         array = [];
       }
     }
-    if (array.length > 0 && array.length < parseInt(this.maxlength)) {
+    if (array.length > 0 && array.length < rowSize) {
       this.resultList2.push(array);
     }
   },
@@ -592,6 +569,16 @@ export default {
       that.setResultListAll();
     });
   },
+  getEnglishResults(seedValue) {
+    const seed = this.normalizeEnglishSeed(seedValue);
+    if (!seed) {
+      this.resultList = [];
+      this.setResultListAll();
+      return;
+    }
+    this.resultList = this.parseEnglishSuggestions(this.englishsuggestions);
+    this.setResultListAll();
+  },
   onSelect(num) {
     this.$emit("keyDown", { content: num });
     if (this.keyboardtype === "T9" && this.screentype !== "pill-shaped") {
@@ -599,14 +586,10 @@ export default {
       return;
     }
     this.onVibrate();
-    if ((this.lang === 'cn' || this.lang === 'jp')  && !this.numFlag) {
+    if (this.lang === "cn" && !this.numFlag) {
       this.cval += num.toLowerCase();
     } else if (this.lang === "en" && !this.numFlag) {
-      if (this.upperFlag) {
-        this.addAllTxt(num.toUpperCase());
-      } else {
-        this.addAllTxt(num.toLowerCase());
-      }
+      this.addAllTxt(num.toLowerCase());
     } else {
       this.addAllTxt(num);
     }
@@ -617,11 +600,7 @@ export default {
     if (this.lang === "cn") {
       this.cval += this.waitingList[num].toString();
     } else {
-      if (this.upperFlag) {
-        this.addAllTxt(this.waitingList[num].toUpperCase());
-      } else {
-        this.addAllTxt(this.waitingList[num].toLowerCase());
-      }
+      this.addAllTxt(this.waitingList[num].toLowerCase());
     }
     this.clearWaiting();
     this.resetReslutList();
@@ -639,10 +618,21 @@ export default {
     }
   },
   watchKeyboardTypePropsChange(newV, oldV) {
-    if (newV === "T9" && this.lang === "jp") {
+    if (this.lang !== "cn" && this.lang !== "en") {
       this.lang = "cn";
+      this.numFlag_jp = false;
       this.cval = "";
       this.clearWaiting();
+      this.resetReslutList();
+    }
+  },
+  watchEnglishSeedPropsChange(newV, oldV) {
+    if (this.lang === "en" && newV !== oldV) {
+      this.resetReslutList();
+    }
+  },
+  watchEnglishSuggestionsPropsChange(newV, oldV) {
+    if (this.lang === "en" && newV !== oldV) {
       this.resetReslutList();
     }
   },
@@ -664,6 +654,26 @@ export default {
     this.clearWaiting();
     this.resetReslutList();
     this.addAllTxt(temp);
+  },
+  normalizeEnglishSeed(value) {
+    const text = (value || "").toLowerCase();
+    const match = text.match(/[a-z][a-z'-]*$/);
+    return match && match[0] ? match[0] : "";
+  },
+  parseEnglishSuggestions(value) {
+    const text = value || "";
+    if (!text) {
+      return [];
+    }
+    const parts = text.split("|");
+    const output = [];
+    for (let i = 0; i < parts.length && output.length < 30; i++) {
+      const item = parts[i];
+      if (item) {
+        output.push(item);
+      }
+    }
+    return output;
   },
   adjustScreenWidth(){
     device.getInfo({

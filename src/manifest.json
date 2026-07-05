@@ -23,6 +23,9 @@
     },
     {
       "name": "system.storage"
+    },
+    {
+      "name": "system.prompt"
     }
   ],
   "config": {

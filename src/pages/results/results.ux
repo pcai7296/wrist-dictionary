@@ -22,7 +22,9 @@
           </div>
           <text class="result-phonetic">{{ item.phonetic }}</text>
           <div class="translation-box">
-            <text class="result-translation-line" for="{{ line in item.translationLines }}">{{ line }}</text>
+            <text class="result-translation-line" for="{{ line in item.translationLines }}">
+              {{ line }}
+            </text>
           </div>
         </div>
       </list-item>
@@ -33,10 +35,16 @@
 <script>
 import router from "@system.router"
 import file from "@system.file"
+import prompt from "@system.prompt"
+
+const FUZZY_SCAN_LIMIT = 4000
+const FUZZY_POOL_LIMIT = 80
 
 export default {
   protected: {
-    query: ""
+    query: "",
+    searchMode: "",
+    inflectDepth: ""
   },
 
   private: {
@@ -47,6 +55,9 @@ export default {
     shardIndex: null,
     fileCache: {},
     entryCache: {},
+    fuzzyWordsChecked: 0,
+    lastToastAt: 0,
+    toastCooldown: 1500,
     touchStartX: -1,
     touchStartY: -1
   },
@@ -68,10 +79,12 @@ export default {
     router.push({
       uri: "/pages/detail",
       params: {
-      word: item.word,
-      phonetic: item.rawPhonetic || "",
-      translation: item.translation || "",
-      tag: item.tag || ""
+        word: item.word,
+        phonetic: item.rawPhonetic || "",
+        translation: item.translation || "",
+        tag: item.tag || "",
+        searchMode: this.searchMode || "",
+        inflectDepth: this.inflectDepth || "0"
       }
     })
   },
@@ -111,17 +124,40 @@ export default {
             return
           }
 
-          this.resultCards = results.slice(0, 20)
-          if (this.resultCards.length === 0) {
-            this.statusText = "未找到"
-          } else if (results.length >= 20) {
-            this.statusText = "最多显示20条"
-          } else {
-            this.statusText = ""
-          }
+          this.finishEnglishSearch(normalized, token, results)
         })
       })
     })
+  },
+
+  finishEnglishSearch(query, token, results) {
+    if (results.length === 0 && this.searchMode !== "inflect" && this.isEnglishWord(query)) {
+      this.showToast("未找到，混淆搜索")
+      this.statusText = "深度搜索"
+      this.collectFuzzyResults(query, (cards) => {
+        if (token !== this.searchToken) {
+          return
+        }
+        this.resultCards = cards.slice(0, 20)
+        if (this.resultCards.length === 0) {
+          this.statusText = "未找到"
+        } else if (cards.length >= 20) {
+          this.statusText = "相近结果20条"
+        } else {
+          this.statusText = "相近结果"
+        }
+      })
+      return
+    }
+
+    this.resultCards = results.slice(0, 20)
+    if (this.resultCards.length === 0) {
+      this.statusText = "未找到"
+    } else if (results.length >= 20) {
+      this.statusText = "最多显示20条"
+    } else {
+      this.statusText = ""
+    }
   },
 
   performChineseSearch(query, token) {
@@ -203,7 +239,9 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower] && this.normalizeChineseText(item.translation).indexOf(query) >= 0) {
             seen[lower] = true
-            results.push(this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag))
+            results.push(
+              this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
+            )
           }
         }
         nextIndex++
@@ -351,6 +389,185 @@ export default {
     }
   },
 
+  collectFuzzyResults(query, done) {
+    const shards = this.getFuzzyShards(query)
+    const items = []
+    const seen = {}
+    this.fuzzyWordsChecked = 0
+    this.collectFuzzyShardResults(shards, query, items, seen, 0, () => {
+      items.sort((left, right) => {
+        if (left.distance !== right.distance) {
+          return left.distance - right.distance
+        }
+        if (right.score !== left.score) {
+          return right.score - left.score
+        }
+        return left.word.length - right.word.length
+      })
+
+      const cards = []
+      for (let i = 0; i < items.length && cards.length < 20; i++) {
+        const item = items[i]
+        cards.push(
+          this.createResultCard(item.lower, item.word, item.phonetic, item.translation, "相近")
+        )
+      }
+      done(cards)
+    })
+  },
+
+  getFuzzyShards(query) {
+    const ordered = []
+    const seen = {}
+    const first = query.charAt(0)
+    if (this.shardIndex && this.shardIndex[first]) {
+      this.pushUniqueShards(ordered, seen, this.shardIndex[first])
+    }
+    if (this.shardIndex) {
+      for (const key in this.shardIndex) {
+        this.pushUniqueShards(ordered, seen, this.shardIndex[key])
+      }
+    }
+    return ordered
+  },
+
+  pushUniqueShards(output, seen, shards) {
+    for (let i = 0; i < shards.length; i++) {
+      const shard = shards[i]
+      if (shard && !seen[shard]) {
+        seen[shard] = true
+        output.push(shard)
+      }
+    }
+  },
+
+  collectFuzzyShardResults(shards, query, items, seen, index, done) {
+    if (
+      index >= shards.length ||
+      items.length >= FUZZY_POOL_LIMIT ||
+      this.fuzzyWordsChecked >= FUZZY_SCAN_LIMIT
+    ) {
+      done()
+      return
+    }
+
+    const shard = shards[index]
+    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
+      this.scanFuzzyWordText(text, query, items, seen)
+      this.collectFuzzyShardResults(shards, query, items, seen, index + 1, done)
+    })
+  },
+
+  scanFuzzyWordText(text, query, items, seen) {
+    if (!text) {
+      return
+    }
+    const lines = text.split("\n")
+    for (
+      let i = 0;
+      i < lines.length &&
+      items.length < FUZZY_POOL_LIMIT &&
+      this.fuzzyWordsChecked < FUZZY_SCAN_LIMIT;
+      i++
+    ) {
+      this.fuzzyWordsChecked++
+      const parts = lines[i].split("\t")
+      if (parts.length < 4) {
+        continue
+      }
+      const lower = this.normalizeWord(parts[0])
+      if (!lower || seen[lower] || Math.abs(lower.length - query.length) > 2) {
+        continue
+      }
+      const distance = this.editDistanceBounded(query, lower, 2)
+      if (distance < 0 || distance > 2) {
+        continue
+      }
+      seen[lower] = true
+      items.push({
+        lower: lower,
+        word: parts[0],
+        phonetic: parts[1],
+        translation: parts[2],
+        distance: distance,
+        score: this.scoreFuzzyCandidate(query, lower, parts[3] || "")
+      })
+    }
+  },
+
+  editDistanceBounded(left, right, limit) {
+    const leftLength = left.length
+    const rightLength = right.length
+    if (Math.abs(leftLength - rightLength) > limit) {
+      return -1
+    }
+
+    let previous = []
+    let current = []
+    for (let j = 0; j <= rightLength; j++) {
+      previous[j] = j
+    }
+
+    for (let i = 1; i <= leftLength; i++) {
+      current = [i]
+      let rowMin = current[0]
+      const from = Math.max(1, i - limit)
+      const to = Math.min(rightLength, i + limit)
+
+      for (let j = 1; j < from; j++) {
+        current[j] = limit + 1
+      }
+      for (let j = from; j <= to; j++) {
+        const cost = left.charAt(i - 1) === right.charAt(j - 1) ? 0 : 1
+        const deletion = previous[j] + 1
+        const insertion = current[j - 1] + 1
+        const substitution = previous[j - 1] + cost
+        const value = Math.min(deletion, insertion, substitution)
+        current[j] = value
+        if (value < rowMin) {
+          rowMin = value
+        }
+      }
+      for (let j = to + 1; j <= rightLength; j++) {
+        current[j] = limit + 1
+      }
+      if (rowMin > limit) {
+        return -1
+      }
+      previous = current
+    }
+
+    const result = previous[rightLength]
+    return result <= limit ? result : -1
+  },
+
+  scoreFuzzyCandidate(query, word, tag) {
+    let score = 80 - Math.abs(word.length - query.length) * 8
+    const tags = tag || ""
+    if (word.charAt(0) === query.charAt(0)) {
+      score += 20
+    }
+    if (tags.indexOf("zk") >= 0) {
+      score += 40
+    }
+    if (tags.indexOf("gk") >= 0) {
+      score += 36
+    }
+    if (tags.indexOf("cet4") >= 0) {
+      score += 30
+    }
+    if (tags.indexOf("cet6") >= 0 || tags.indexOf("ky") >= 0) {
+      score += 18
+    }
+    if (tags.indexOf("toefl") >= 0 || tags.indexOf("ielts") >= 0) {
+      score += 8
+    }
+    if (tags.indexOf("gre") >= 0) {
+      score -= 8
+    }
+    return score
+  },
+
   createResultCard(id, word, phonetic, translation, tag) {
     const lines = this.wrapText(translation || "", 168)
     const safeLines = lines.length > 0 ? lines : [""]
@@ -445,7 +662,15 @@ export default {
     if (ch >= "0" && ch <= "9") {
       return 7
     }
-    if (ch === " " || ch === "." || ch === "," || ch === ";" || ch === ":" || ch === "/" || ch === "-") {
+    if (
+      ch === " " ||
+      ch === "." ||
+      ch === "," ||
+      ch === ";" ||
+      ch === ":" ||
+      ch === "/" ||
+      ch === "-"
+    ) {
       return 4
     }
     return 8
@@ -474,6 +699,22 @@ export default {
 
   normalizeWord(value) {
     return (value || "").toLowerCase().trim()
+  },
+
+  isEnglishWord(value) {
+    return /^[a-z][a-z'-]*$/.test(value || "")
+  },
+
+  showToast(message) {
+    const now = Date.now()
+    if (now - this.lastToastAt < this.toastCooldown) {
+      return
+    }
+    this.lastToastAt = now
+    prompt.showToast({
+      message: message,
+      duration: 1500
+    })
   },
 
   hasChinese(value) {

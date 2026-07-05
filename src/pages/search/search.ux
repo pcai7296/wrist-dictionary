@@ -11,15 +11,17 @@
     </div>
 
     <div class="edit-row">
-      <input class="edit-button side-button" type="button" value="<" @click="moveLeft" />
+      <input class="edit-button side-button" type="button" value="左" @click="moveLeft" />
       <input class="edit-button clear-button" type="button" value="清空" @click="clearText" />
-      <input class="edit-button side-button" type="button" value=">" @click="moveRight" />
+      <input class="edit-button side-button" type="button" value="右" @click="moveRight" />
     </div>
 
     <input-method
       hide="{{ keyboardHidden }}"
       keyboardtype="{{ keyboardType }}"
-      maxlength="24"
+      maxlength="5"
+      englishseed="{{ englishSeed }}"
+      englishsuggestions="{{ englishSuggestionsText }}"
       vibratemode="{{ vibrateMode }}"
       screentype="{{ screenType }}"
       @visibility-change="onVisibilityChange"
@@ -33,21 +35,48 @@
 <script>
 import router from "@system.router"
 import storage from "@system.storage"
+import prompt from "@system.prompt"
+import {ENGLISH_SUGGESTION_BUCKETS} from "../../common/english_suggestions.js"
+
+const ENGLISH_SUFFIXES = [
+  "s",
+  "ed",
+  "ing",
+  "er",
+  "est",
+  "ly",
+  "tion",
+  "ment",
+  "ness",
+  "able",
+  "ful",
+  "less",
+  "ive",
+  "al",
+  "ous",
+  "ity"
+]
 
 export default {
   protected: {
     queryParam: "",
-    autoSearch: ""
+    autoSearch: "",
+    searchMode: "",
+    inflectDepth: ""
   },
 
   private: {
     query: "",
     cursorIndex: 0,
     displayText: "",
+    englishSeed: "",
+    englishSuggestionsText: "",
     keyboardHidden: false,
     keyboardType: "QWERTY",
     vibrateMode: "short",
     screenType: "pill-shaped",
+    lastToastAt: 0,
+    toastCooldown: 1500,
     touchStartX: -1,
     touchStartY: -1
   },
@@ -91,7 +120,8 @@ export default {
   onComplete(evt) {
     if (evt && evt.detail && evt.detail.content) {
       const content = evt.detail.content
-      this.query = this.query.slice(0, this.cursorIndex) + content + this.query.slice(this.cursorIndex)
+      this.query =
+        this.query.slice(0, this.cursorIndex) + content + this.query.slice(this.cursorIndex)
       this.cursorIndex += content.length
     }
     this.refreshDisplay()
@@ -125,14 +155,60 @@ export default {
     if (!normalized) {
       return
     }
+    if (!this.validateQuery(normalized)) {
+      return
+    }
 
     this.saveSearchHistory(normalized)
 
     router.push({
       uri: "/pages/results",
       params: {
-        query: normalized
+        query: normalized,
+        searchMode: this.searchMode || "",
+        inflectDepth: this.inflectDepth || "0"
       }
+    })
+  },
+
+  validateQuery(query) {
+    if (this.searchMode === "inflect") {
+      if (!this.isEnglishWord(query)) {
+        this.showToast("只能输入英文")
+        return false
+      }
+      return true
+    }
+
+    const hasChinese = this.hasChinese(query)
+    const hasEnglish = this.hasEnglish(query)
+    if (hasChinese && hasEnglish) {
+      this.showToast("输入非法")
+      return false
+    }
+    if (hasChinese) {
+      if (!this.isChineseQuery(query)) {
+        this.showToast("输入非法")
+        return false
+      }
+      return true
+    }
+    if (!this.isEnglishWord(query)) {
+      this.showToast("输入非法")
+      return false
+    }
+    return true
+  },
+
+  showToast(message) {
+    const now = Date.now()
+    if (now - this.lastToastAt < this.toastCooldown) {
+      return
+    }
+    this.lastToastAt = now
+    prompt.showToast({
+      message: message,
+      duration: 1500
     })
   },
 
@@ -224,6 +300,8 @@ export default {
     if (!this.query) {
       this.cursorIndex = 0
       this.displayText = ""
+      this.englishSeed = ""
+      this.englishSuggestionsText = ""
       return
     }
 
@@ -234,11 +312,139 @@ export default {
       this.cursorIndex = this.query.length
     }
 
-    this.displayText = this.query.slice(0, this.cursorIndex) + (this.keyboardHidden ? "" : "_") + this.query.slice(this.cursorIndex)
+    this.displayText =
+      this.query.slice(0, this.cursorIndex) +
+      (this.keyboardHidden ? "" : "_") +
+      this.query.slice(this.cursorIndex)
+    this.updateEnglishSeed()
+  },
+
+  updateEnglishSeed() {
+    const text = this.query.slice(0, this.cursorIndex).toLowerCase()
+    const match = text.match(/[a-z][a-z'-]*$/)
+    const nextSeed = match && match[0] ? match[0] : ""
+    if (nextSeed === this.englishSeed) {
+      return
+    }
+    this.englishSeed = nextSeed
+    this.refreshEnglishSuggestions(nextSeed)
+  },
+
+  refreshEnglishSuggestions(seed) {
+    const normalized = this.normalizeEnglishSeed(seed)
+    if (!normalized) {
+      this.englishSuggestionsText = ""
+      return
+    }
+
+    const source = ENGLISH_SUGGESTION_BUCKETS[normalized.charAt(0)] || ""
+    const rows = source ? source.split("\n") : []
+    const items = []
+    const seen = {}
+    this.scanEnglishSuggestionRows(rows, normalized, items, seen)
+    this.englishSuggestionsText = this.buildEnglishSuggestions(normalized, items, seen).join("|")
+  },
+
+  scanEnglishSuggestionRows(rows, seed, items, seen) {
+    for (let i = 0; i < rows.length; i++) {
+      const parts = rows[i].split("\t")
+      const word = this.normalizeEnglishSeed(parts[0])
+      if (!word || word === seed || seen[word] || word.indexOf(seed) !== 0) {
+        continue
+      }
+      seen[word] = true
+      items.push({
+        word: word,
+        score: this.scoreEnglishCandidate(seed, word, parts[1] || "")
+      })
+    }
+  },
+
+  buildEnglishSuggestions(seed, items, seen) {
+    items.sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score
+      }
+      return left.word.length - right.word.length
+    })
+    const output = []
+    for (let i = 0; i < items.length && output.length < 30; i++) {
+      output.push(items[i].word)
+    }
+    if (seed.length >= 2) {
+      for (let i = 0; i < ENGLISH_SUFFIXES.length && output.length < 30; i++) {
+        const suffix = ENGLISH_SUFFIXES[i]
+        const combined = seed + suffix
+        if (!seen[combined] && output.indexOf(suffix) < 0) {
+          output.push(suffix)
+        }
+      }
+    }
+    return output
+  },
+
+  scoreEnglishCandidate(seed, word, tag) {
+    let score = 100 - (word.length - seed.length) * 4
+    const tags = tag || ""
+    if (tags.indexOf("zk") >= 0) {
+      score += 40
+    }
+    if (tags.indexOf("gk") >= 0) {
+      score += 36
+    }
+    if (tags.indexOf("cet4") >= 0) {
+      score += 30
+    }
+    if (tags.indexOf("cet6") >= 0 || tags.indexOf("ky") >= 0) {
+      score += 18
+    }
+    if (tags.indexOf("toefl") >= 0 || tags.indexOf("ielts") >= 0) {
+      score += 8
+    }
+    if (tags.indexOf("gre") >= 0) {
+      score -= 8
+    }
+    return score
+  },
+
+  normalizeEnglishSeed(value) {
+    const text = (value || "").toLowerCase()
+    const match = text.match(/[a-z][a-z'-]*$/)
+    return match && match[0] ? match[0] : ""
   },
 
   normalizeWord(value) {
     return (value || "").toLowerCase().trim()
+  },
+
+  isEnglishWord(value) {
+    return /^[a-z][a-z'-]*$/.test(value || "")
+  },
+
+  hasEnglish(value) {
+    return /[a-z]/.test(value || "")
+  },
+
+  hasChinese(value) {
+    const text = value || ""
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charAt(i)
+      if (ch >= "\u4e00" && ch <= "\u9fff") {
+        return true
+      }
+    }
+    return false
+  },
+
+  isChineseQuery(value) {
+    const text = value || ""
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charAt(i)
+      if (ch < "\u4e00" || ch > "\u9fff") {
+        return false
+      }
+    }
+    return text.length > 0
   }
 }
 </script>

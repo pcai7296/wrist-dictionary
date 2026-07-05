@@ -64,7 +64,7 @@ dist/                          — .rpk packages (gitignored)
 - **Router features**: `system.router`, `system.vibrator`, `system.device`, `system.file`, `system.storage`.
 - **Storage keys**: `dic_history` (search history, max 20), `dic_favorites` (max 20). Both plain JSON arrays in `@system.storage`.
 - **Screen**: Canvas is 212×520px. Background `#020813`. Blue/white/black color scheme.
-- **Dictionary**: 14,942 headwords from [ECDICT](https://github.com/skywind3000/ECDICT) (MIT). File-based lookup via sharded text files in `src/common/dict/`. Results capped at 20.
+- **Dictionary**: 14,942 headwords from [ECDICT](https://github.com/skywind3000/ECDICT) (MIT), plus BNC/COCA word-family data from EAP Foundation. File-based lookup via sharded text files in `src/common/dict/`. Results capped at 20.
 
 ## Dictionary internals
 
@@ -72,7 +72,7 @@ dist/                          — .rpk packages (gitignored)
 - **Chinese lookup**: Chinese-only chars in translation are indexed by Unicode `codepoint % 64` into 64 bucket files (`zh_00.txt`..`zh_3f.txt`). Each maps a Chinese char → list of entry IDs.
 - **Inflect lookup**: Inflected forms map back to headwords via `inflect/` shards.
 - **Entry lookup**: Entries sharded by `entryId / 500`. Used only for Chinese search path.
-- **Generated code**: Run `python scripts/generate_watch_dict.py` to regenerate. The CSV source is at `data/ecdict_tagged_14942_compact.csv`. Never edit shard files directly.
+- **Generated code**: Run `python scripts/generate_watch_dict.py` to regenerate. Sources are `data/ecdict_tagged_14942_compact.csv` and optional `data/bnc_coca_word_family_lists_v2.xlsx`. Never edit shard files directly.
 
 ## InputMethod component
 

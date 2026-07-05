@@ -17,7 +17,7 @@
       </div>
     </div>
 
-    <input class="main-button primary-button" type="button" value="查找变形" />
+    <input class="main-button primary-button" type="button" value="查找变形" @click="goInflectSearch" />
     <input class="main-button secondary-button" type="button" value="中英查找" @click="goSearch" />
     <input class="main-button secondary-button" type="button" value="历史记录" @click="goHistory" />
     <input class="main-button secondary-button" type="button" value="我的收藏" @click="goFavorites" />
@@ -33,6 +33,16 @@
 import router from "@system.router"
 
 export default {
+  goInflectSearch() {
+    router.push({
+      uri: "/pages/search",
+      params: {
+        searchMode: "inflect",
+        inflectDepth: "0"
+      }
+    })
+  },
+
   goSearch() {
     router.push({
       uri: "/pages/search"
