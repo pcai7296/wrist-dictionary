@@ -186,5 +186,5 @@ python scripts/generate_watch_dict.py
 ---
 
 <p align="center">
-  <sub><a href="https://github.com/pcai7296/----">GitHub 仓库</a></sub>
+  <sub><a href="https://github.com/pcai7296/wrist-dictionary">GitHub 仓库</a></sub>
 </p>
