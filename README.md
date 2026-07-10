@@ -2,196 +2,189 @@
   <img src="design/wrist-dictionary-home.svg" width="240" alt="腕上词典" />
 </p>
 
-<h1 align="center">腕上词典 · Wrist Dictionary</h1>
+<h1 align="center">腕上词典</h1>
 
 <p align="center">
-  <em>A full-featured English–Chinese dictionary app for Xiaomi Band — right on your wrist.</em>
+  <em>小米手环上的离线词典 — 抬手即查，无需掏手机</em>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-Mi%20Band-1d74e8?style=flat-square" alt="Platform" />
-  <img src="https://img.shields.io/badge/framework-Vela%20QuickApp-1d74e8?style=flat-square" alt="Framework" />
-  <img src="https://img.shields.io/badge/headwords-14k+-2ea043?style=flat-square" alt="Headwords" />
-  <img src="https://img.shields.io/badge/languages-EN%20%7C%20ZH%20%7C%20JA-1d74e8?style=flat-square" alt="Languages" />
-  <img src="https://img.shields.io/badge/build-aiot--toolkit-ff6b35?style=flat-square" alt="Build" />
+  <img src="https://img.shields.io/badge/平台-Mi%20Band-1d74e8?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/框架-Vela%20QuickApp-1d74e8?style=flat-square" alt="Framework" />
+  <img src="https://img.shields.io/badge/词库-14k%2B-2ea043?style=flat-square" alt="Headwords" />
+  <img src="https://img.shields.io/badge/输入-英%20%7C%20中%20%7C%20日-1d74e8?style=flat-square" alt="Languages" />
+  <img src="https://img.shields.io/badge/工具-aiot--toolkit-ff6b35?style=flat-square" alt="Build" />
 </p>
 
 ---
 
-## Overview
+## 简介
 
-**腕上词典** (Wrist Dictionary) is a Xiaomi Vela Quick App that turns your Mi Band smartwatch into a pocket dictionary. Look up English words, Chinese characters, inflected verb forms, and Japanese text — all without pulling out your phone.
+**腕上词典** 是一款运行在小米手环上的 Vela 快应用，把一部完整的英汉词典装进手腕。查英语单词、汉字、动词变形、日语假名——全程离线，抬手即用。
 
-Built with Xiaomi's `aiot-toolkit`, it packs an offline dictionary of **14,942 headwords** from ECDICT (enriched with BNC/COCA word-family data) into a 212×520 canvas optimized for the wrist.
-
----
-
-## Features
-
-- **🔍 Three Search Modes** — English word lookup (exact + prefix), Chinese character search (via Pinyin input), and inflected form reverse lookup
-- **⌨️ Full Input Method** — QWERTY keyboard, T9 input, Chinese Pinyin IME, and Japanese Romaji→Kana conversion — adapts to pill-shaped, round, and rectangular screens
-- **✨ Smart Autocomplete** — Letter-indexed English suggestions tagged by exam level (中考/高考/CET-4/CET-6/考研/TOEFL/IELTS/GRE)
-- **🌀 Fuzzy Search** — Edit-distance based matching (max 2 edits) over 14k+ headwords, perfect for typos
-- **📖 Inflected Form Lookup** — Type `ran` → find "run", type `better` → find "good"
-- **❤️ Favorites & History** — Save up to 20 favorite words; view and replay recent searches
-- **🌙 Dark Theme** — Deep navy background (`#020813`) with blue accent (`#1d74e8`) — easy on the eyes in any light
-- **📦 Fully Offline** — Dictionary data ships with the app. No network required.
+基于小米 `aiot-toolkit` 开发，内置 **14,942 条词汇**（数据源：ECDICT + BNC/COCA 词族），全部压缩在 212×520 像素的手环屏幕中。
 
 ---
 
-## Screenshots
+## 功能
 
-<img src="design/wrist-dictionary-home.png" width="212" alt="Home Screen" />
-
-> Home screen with the open-book icon and main navigation: Inflect Search, English/Chinese Search, History, and Favorites.
-
----
-
-## Pages
-
-| Page | Route | Description |
-|------|-------|-------------|
-| **Home** | `pages/index` | Entry point — 4 main buttons + About / Sponsor |
-| **Search** | `pages/search` | Text input with IME, cursor editing, autocomplete |
-| **Results** | `pages/results` | Search results (English + Chinese lookup) |
-| **Detail** | `pages/detail` | Word detail with definition, examples, favorite toggle |
-| **Records** | `pages/records` | Browse history or favorites list (type param) |
-| **About** | `pages/about` | Credits, version, license info |
-| **Sponsor** | `pages/sponsor` | Donation QR code |
+- **🔍 三种查词模式** — 英语精确/前缀匹配、中文拼音输入查词、动词/形容词变形反查
+- **⌨️ 完整输入法** — QWERTY 全键盘、T9 九宫格、中文拼音输入法、日语罗马音→假名转换；适配药丸屏、圆形屏、矩形屏
+- **✨ 智能补全** — 按字母分桶的英语建议列表，标注考试等级（中考/高考/CET-4/CET-6/考研/TOEFL/IELTS/GRE）
+- **🌀 模糊搜索** — 基于编辑距离的容错匹配（最多 2 个差异），输错也能找到
+- **📖 变形查词** — 输入 `ran` → 找到 "run"，输入 `better` → 找到 "good"
+- **❤️ 收藏与历史** — 最多保存 20 条收藏和 20 条搜索历史
+- **🌙 深色主题** — 深蓝底色 `#020813` + 蓝色强调 `#1d74e8`，暗光下不刺眼
+- **📦 纯离线** — 词典数据内置于应用，无需网络
 
 ---
 
-## Quick Start
+## 页面
+
+| 页面 | 路由 | 说明 |
+|------|------|------|
+| **首页** | `pages/index` | 入口 — 4 个主按钮 + 关于 / 赞助 |
+| **搜索** | `pages/search` | 输入法输入、光标编辑、自动补全 |
+| **结果** | `pages/results` | 英文/中文查词结果 |
+| **详情** | `pages/detail` | 单词释义、变形、收藏切换 |
+| **记录** | `pages/records` | 历史记录 / 收藏列表（参数区分） |
+| **关于** | `pages/about` | 致谢、版本、许可信息 |
+| **赞助** | `pages/sponsor` | 赞赏码 |
+
+---
+
+## 快速开始
 
 ```bash
-# Install dependencies
+# 安装依赖
 npm install
 
-# Start dev server with hot-reload
+# 启动开发服务器（热重载）
 npm run start
 
-# Build for production
+# 构建生产包
 npm run build
 
-# Release build (minified + signed)
+# 发布构建（压缩 + 签名）
 npm run release
 
-# Lint all source files
+# 代码检查
 npm run lint
 ```
 
-### Deploy to Watch
+### 部署到手环
 
 ```bash
-# Build and push to emulator (default)
+# 构建并推送到模拟器（默认）
 npm run deploy:watch
 
-# Push to real device
+# 推送到真机
 npm run deploy:watch -- -Serial 192.168.x.x:5555
 
-# Skip build, push existing RPK only
+# 仅推送已有 RPK，跳过构建
 npm run deploy:watch:fast
 ```
 
 ---
 
-## Project Structure
+## 项目结构
 
 ```
 src/
-├── app.ux                        # App lifecycle (onCreate/onDestroy)
-├── manifest.json                 # Router, features, permissions
+├── app.ux                        # 应用生命周期
+├── manifest.json                 # 路由、特性声明、权限
 ├── pages/
-│   ├── index/                    # Home — entry page
-│   ├── search/                   # Search with IME, cursor editing
-│   ├── results/                  # English + Chinese results
-│   ├── detail/                   # Word detail + favorite toggle
-│   ├── records/                  # History / Favorites list
-│   ├── about/                    # Credits & license
-│   └── sponsor/                  # Donation QR code
+│   ├── index/                    # 首页
+│   ├── search/                   # 搜索（输入法 + 光标编辑）
+│   ├── results/                  # 英/中查词结果
+│   ├── detail/                   # 单词详情 + 收藏
+│   ├── records/                  # 历史 / 收藏列表
+│   ├── about/                    # 关于
+│   └── sponsor/                  # 赞赏
 ├── components/
-│   └── InputMethod/              # Full IME (QWERTY/T9, CN/EN/JP, 3 screen shapes)
+│   └── InputMethod/              # 完整输入法（QWERTY/T9，中/英/日，3 种屏形）
 ├── common/
-│   ├── dict/                     # Dictionary shards (generated, do not edit)
-│   ├── english_suggestions.js    # Letter-indexed autocomplete word lists
-│   └── logo.png                  # App icon
-├── i18n/                         # i18n locale files (zh-CN, en, defaults)
+│   ├── dict/                     # 词典分片（自动生成，请勿手动编辑）
+│   ├── english_suggestions.js    # 按字母分桶的英语补全列表
+│   └── logo.png                  # 应用图标
+├── i18n/                         # 国际化文件（zh-CN, en, defaults）
 scripts/
-├── deploy_watch.ps1              # ADB deploy helper
-└── generate_watch_dict.py        # Dictionary generator from ECDICT
+├── deploy_watch.ps1              # ADB 部署脚本
+└── generate_watch_dict.py        # 词典生成器（从 ECDICT 生成）
 ```
 
 ---
 
-## Dictionary Architecture
+## 词典架构
 
-The offline dictionary engine is designed for smartwatch constraints — minimal memory, fast startup, no database.
+离线词典引擎针对手环场景设计——低内存、快速启动、无数据库。
 
-| Component | Description |
-|-----------|-------------|
-| **English Index** | Words sharded by 2-char prefix key. Single-letter queries use `index_en.txt` map |
-| **Chinese Index** | Chinese characters indexed by Unicode `codepoint % 64` into 64 bucket files |
-| **Inflect Index** | Inflected forms → headword mapping via sharded reverse index |
-| **Entry Store** | Entry data sharded by `entryId / 500`, used by Chinese search path |
-| **Fuzzy Search** | Bounded edit-distance scan (max 2) over shard files, up to 4000 words scanned, 80 candidate pool |
+| 组件 | 说明 |
+|------|------|
+| **英文索引** | 按 2 字符前缀分片；单字母查询走 `index_en.txt` 映射 |
+| **中文索引** | 按 Unicode `codepoint % 64` 分 64 个桶 |
+| **变形索引** | 屈折形式→词头的反向分片索引 |
+| **词条存储** | 按 `entryId / 500` 分片，中文查词路径使用 |
+| **模糊搜索** | 编辑距离受限扫描（≤2），最多扫 4000 词，候选池 80 条 |
 
-> **14,942 headwords** from ECDICT, enriched with BNC/COCA word-family frequency data.
+> **14,942 条词汇**，源自 ECDICT + BNC/COCA 词族频率数据。
 
-### Regenerate Dictionary
+### 重新生成词典
 
 ```bash
 python scripts/generate_watch_dict.py
 ```
 
-Sources: `data/ecdict_tagged_14942_compact.csv` + optional `data/bnc_coca_word_family_lists_v2.xlsx`.
+数据来源：`data/ecdict_tagged_14942_compact.csv` + 可选 `data/bnc_coca_word_family_lists_v2.xlsx`。
 
 ---
 
-## Input Method (IME)
+## 输入法
 
-The `InputMethod` component supports three screen shapes and three languages:
+`InputMethod` 组件支持三种屏幕形状和三种语言：
 
-- **Screen shapes**: `pill-shaped` (default), `circle` (480×321 keyboard area), `rect`
-- **Keyboard layouts**: QWERTY (full) and T9 (predictive)
-- **Languages**: English, Chinese (Pinyin→Hanzi), Japanese (Romaji→Kana)
+- **屏幕形状**：`pill-shaped`（药丸屏，默认）、`circle`（圆形屏，480×321 键盘区）、`rect`（矩形屏）
+- **键盘布局**：QWERTY 全键盘、T9 九宫格
+- **输入语言**：英语、中文（拼音→汉字）、日语（罗马音→假名）
 
-Powered by `dicUtil.js` orchestrating:
-- `dic.js` — Pinyin-to-Hanzi mapping
-- `dic_jp.js` — Romaji-to-Kana/Kanji mapping
+由 `dicUtil.js` 协调以下模块：
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| **Framework** | Xiaomi Vela QuickApp (`.ux` SFC) |
-| **Toolchain** | `aiot-toolkit` v2.0.5 / `rspack` v1.7.12 |
-| **JS Runtime** | Vela JS Engine (JSC bytecode) |
-| **Screen** | 212×520px, `designWidth: device-width` |
-| **Storage** | `@system.storage` (JSON) |
-| **Router** | `@system.router` (7 pages) |
-| **Linting** | ESLint + Prettier + Stylelint |
-| **Commit** | Commitlint (conventional commits) |
-| **Deploy** | ADB push + `pm install` |
+- `dic.js` — 拼音→汉字映射
+- `dic_jp.js` — 罗马音→假名/汉字映射
 
 ---
 
-## Code Conventions
+## 技术栈
 
-- No semicolons · Double quotes · No trailing commas · `bracketSpacing: false`
-- Print width 100 · 2-space indent
-- Conventional commits: `feat:`, `fix:`, `style:`, `refactor:`, `docs:`, etc.
-- No `as any` / `@ts-ignore` / empty catch blocks
+| 层级 | 技术 |
+|------|------|
+| **框架** | Xiaomi Vela QuickApp (`.ux` SFC) |
+| **工具链** | `aiot-toolkit` v2.0.5 / `rspack` v1.7.12 |
+| **运行时** | Vela JS Engine（JSC 字节码） |
+| **屏幕** | 212×520px, `designWidth: device-width` |
+| **存储** | `@system.storage`（JSON） |
+| **路由** | `@system.router`（7 页面） |
+| **代码检查** | ESLint + Prettier + Stylelint |
+| **提交规范** | Commitlint（约定式提交） |
+| **部署** | ADB push + `pm install` |
 
 ---
 
-## License
+## 代码规范
 
-Built with ❤️ as an open-source wrist companion. Dictionary data sourced from [ECDICT](https://github.com/skywind3000/ECDICT).
+- 无分号 · 双引号 · 无尾逗号 · `bracketSpacing: false`
+- 行宽 100 · 2 空格缩进
+- 约定式提交：`feat:`、`fix:`、`style:`、`refactor:`、`docs:` 等
+- 禁止 `as any` / `@ts-ignore` / 空 catch 块
+
+---
+
+## 许可
+
+腕上词典是开源的手腕伴侣。词库数据来自 [ECDICT](https://github.com/skywind3000/ECDICT)。
 
 ---
 
 <p align="center">
-  <sub>Available on <a href="https://github.com/pcai7296/----">GitHub</a></sub>
+  <sub><a href="https://github.com/pcai7296/----">GitHub 仓库</a></sub>
 </p>
