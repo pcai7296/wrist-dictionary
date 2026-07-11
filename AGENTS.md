@@ -4,155 +4,182 @@
 
 ## What this is
 
-**腕上词典** (Wrist Dictionary) — a Xiaomi Vela Quick App (快应用) for Mi Band smartwatches. Built with `aiot-toolkit` (`aiot` CLI). Single-page SFC format (`.ux` files: `<template>` + `<script>` + `<style>` in one file, parsed by prettier as Vue).
+**腕上词典** (Wrist Dictionary) — a Xiaomi Vela QuickApp for Mi Band smartwatches. Built with `aiot-toolkit` (`aiot` CLI). Single-page SFC format (`.ux` files: `<template>` + `<script>` + `<style>` in one file, parsed by prettier as Vue).
 
-## Quick commands
+## Key config
+
+| File | What |
+|------|------|
+| `opencode.json` | Instructs OpenCode to load `AGENTS.md` + `.opencode/instructions/vela.md` |
+| `.opencode/instructions/conventions.md` | Font-size rules (min 18px), known issues (about page text clipping), emulator policy |
+| `.opencode/instructions/dictionary-coverage.md` | Dictionary coverage analysis + CC-CEDICT integration details |
+| `.prettierrc.js` | No semicolons, double quotes, no trailing commas, `bracketSpacing: false`, printWidth 100, 2-space indent. `.ux` parsed as Vue. |
+| `.stylelintrc.js` | Allows custom Vela CSS properties (`placeholder-color`, `gradient-*`, `caret-color`, etc) and `:blur` pseudo-class |
+| `commitlint.config.js` | Conventional commits with custom types: `bug`, `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `revert`, `merge` |
+| `.eslintignore` | Ignores `dist/`, `build/`, `sign/`, `node_modules/` |
+| `.gitignore` | Also ignores `dist/`, `build/`, `sign/`, `src/common/dict/` (generated), `.husky/`, `.codegraph/`, `.omo/` |
+
+No `.eslintrc*` file exists in the repo — ESLint defaults are applied via `aiot-toolkit`.
+
+## Commands
 
 | Command | What it does |
 |---|---|
 | `npm run start` | Dev server (`aiot start --watch`) |
 | `npm run build` | Build RPK (`aiot build`) |
 | `npm run release` | Release build (`aiot release`) |
-| `npm run lint` | ESLint on `src/` (`--ext .ux,.js`) |
-| `npm run deploy:watch` | Build + ADB push to watch |
+| `npm run lint` | ESLint with `--fix` on `src/` (`--ext .ux,.js`) |
+| `npm run deploy:watch` | Build + ADB push to emulator-5554 |
 | `npm run deploy:watch:fast` | ADB push only (skip build) |
 
-## Code style (Prettier enforced)
+`build/` and `dist/` are both gitignored — outputs of `rspack` v1.7.12 via `aiot-toolkit`.
 
-- No semicolons, double quotes, no trailing commas, `bracketSpacing: false`
-- Print width 100, 2-space indent
-- `.ux` files parsed as Vue
-- `lint-staged` runs Prettier → ESLint/stylelint → `git add` on commit
+## Deploy
 
-## Commit convention
+- `scripts/deploy_watch.ps1` — PowerShell. Targets `emulator-5554` by default. Override: `npm run deploy:watch -- -Serial 192.168.x.x:5555` or `-NoBuild` for RPK-only push.
+- Flow: build → find newest `*.rpk` in `dist/` → `adb push` → `adb shell pm install` → `adb shell am start` → verify via `am dump` (checks `[resumed]` state).
+- Always runs with `$ErrorActionPreference = "Stop"` — exits on any failure.
 
-Commitlint enforces conventional commits with custom types: `bug`, `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `revert`, `merge`.
+## Real device management
+
+`fork_astrobox/` — a fork of AstroBox CLI for managing multiple real watches (pairing, RPK install via queue). Only needed if deploying to real hardware beyond a single device.
+
+## Pre-commit setup
+
+Run `bash husky.sh` once (requires git) to install hooks:
+- Pre-commit via `lint-staged`: Prettier → ESLint (`.ux/.js`); Prettier → stylelint (`./less/.css`)
+- Commit-msg via commitlint
 
 ## Project structure
 
 ```
 src/
-  app.ux                       — App lifecycle (onCreate/onDestroy)
-  manifest.json                — Router, features, package config
+  app.ux                                — App lifecycle (onCreate/onDestroy)
+  manifest.json                         — Router, features, package config
   pages/
-    index/                     — Home (entry page)
-    search/                    — Search with IME, cursor editing
-    results/                   — Search results (English + Chinese lookup)
-    detail/                    — Word detail with favorite toggle
-    records/                   — History or favorites list (type param)
-    about/                     — Credits, license
-    sponsor/                   — Donation QR code
+    index/                               — Home with 4 main buttons
+    search/                              — IME + cursor editing + autocomplete
+    results/                             — English/Chinese lookup results
+    detail/                              — Word detail with favorite toggle
+    records/                             — History or favorites list (type param)
+    about/                               — Credits, license, tag reference
+    sponsor/                             — Donation QR code
   components/
-    InputMethod/               — Full IME (QWERTY/T9, cn/en/jp, 3 screen shapes)
+    InputMethod/                         — English keyboard IME (QWERTY, cursor control, autocomplete)
   common/
-    dict/                      — Generated dictionary shards (do NOT edit manually)
-    logo.png                   — App icon
-  i18n/                        — Placeholder i18n (en.json, zh-CN.json, defaults.json)
+    dict/                                — Generated dictionary shards (gitignored, do NOT edit)
+    english_suggestions.js               — Letter-indexed word list with exam tags
+    icons/                               — Button and decoration icons
 scripts/
-  deploy_watch.ps1             — ADB deploy: push RPK → install → start → verify
-  generate_watch_dict.py       — Dictionary generator from ECDICT CSV
-data/                          — Source dictionary CSV files
-design/                        — Home screen spec and SVG
-sign/                          — Signing keys
-build/                         — Build output (rspack-bundled)
-dist/                          — .rpk packages (gitignored)
+  deploy_watch.ps1                       — ADB deploy
+  generate_watch_dict.py                 — Dictionary generator (ECDICT + CC-CEDICT + BNC/COCA)
+data/                                    — Source dictionary CSV files (ecdict_tagged_14942_compact.csv, cedict.txt.gz)
+omo/                                     — Auxiliary Python scripts (icon gen, coverage tests, analysis)
+  dict_coverage_test.py                  — Offline dictionary hit-rate test
+  coverage_test_v2.py                    — V2 coverage test
+  _gen_*.py                              — Icon/asset generation scripts
+sign/                                    — Signing keys (gitignored)
+collect-ux-review.ps1                    — Gathers all .ux files into one review bundle
 ```
 
-## Key architecture facts
+## 7 pages, router in manifest.json
 
-- **7 pages**, entry is `pages/index`. Router defined in `src/manifest.json`.
-- **Router features**: `system.router`, `system.vibrator`, `system.device`, `system.file`, `system.storage`.
-- **Storage keys**: `dic_history` (search history, max 20), `dic_favorites` (max 20). Both plain JSON arrays in `@system.storage`.
-- **Screen**: Canvas is 212×520px. Background `#020813`. Blue/white/black color scheme.
-- **Dictionary**: 14,942 headwords from [ECDICT](https://github.com/skywind3000/ECDICT) (MIT), plus BNC/COCA word-family data from EAP Foundation. File-based lookup via sharded text files in `src/common/dict/`. Results capped at 20.
+Router features declared in manifest: `system.router`, `system.vibrator`, `system.device`, `system.file`, `system.storage`, **`system.prompt`** (toast messages on search/results/detail).
 
-## Dictionary internals
+## Screen & style
 
-- **English lookup**: Words sharded by 2-char prefix key (`keyFor()`). `index_en.txt` maps first letter → shard names for single-character queries.
-- **Chinese lookup**: Chinese-only chars in translation are indexed by Unicode `codepoint % 64` into 64 bucket files (`zh_00.txt`..`zh_3f.txt`). Each maps a Chinese char → list of entry IDs.
-- **Inflect lookup**: Inflected forms map back to headwords via `inflect/` shards.
-- **Entry lookup**: Entries sharded by `entryId / 500`. Used only for Chinese search path.
-- **Generated code**: Run `python scripts/generate_watch_dict.py` to regenerate. Sources are `data/ecdict_tagged_14942_compact.csv` and optional `data/bnc_coca_word_family_lists_v2.xlsx`. Never edit shard files directly.
+- Canvas: 212×520px, `designWidth: "device-width"`, `minPlatformVersion: 1000`
+- Background `#020813` on all pages except about (`#000000`)
+- Blue/white/black color scheme, dark theme
+- **All text min 18px** — do not go below unless user explicitly OKs truncation (per `conventions.md`)
+
+## Storage
+
+- `dic_history` — search history, plain JSON array, max 20 items
+- `dic_favorites` — favorites, plain JSON array, max 20 items
+- Both via `@system.storage`. Dedup/toggle by normalized word.
+
+## Dictionary (~128k Chinese phrases, 15k English headwords)
+
+Source data: ECDICT + CC-CEDICT + BNC/COCA word-family lists. File-based lookup via sharded text files in `src/common/dict/`. Regenerate with:
+
+```bash
+python scripts/generate_watch_dict.py
+# optional: place data/bnc_coca_word_family_lists_v2.xlsx for word-family data
+```
+
+Never edit shard files directly.
+
+### Lookup architecture
+
+| What | How |
+|------|-----|
+| English lookup | Words sharded by 2-char prefix key (`key_for()`). `index_en.txt` maps first-letter → shard names. |
+| Chinese lookup | Chinese-only chars indexed by Unicode `codepoint % 64` → 64 bucket files (`zh_00.txt`..`zh_3f.txt`). Each maps char → entry IDs. CC-CEDICT phrases merged into same buckets. |
+| Inflect lookup | Inflected forms → headwords via `inflect/` shards + `inflect_reverse/` reverse index. |
+| Entry lookup | Entries sharded by `entryId / 500`. Used for Chinese search path only. |
+| Fuzzy search | Edit distance (max 2) over shard text, scanned up to 4000 words, pool capped at 80 candidates. |
+| Autocomplete | `ENGLISH_SUGGESTION_BUCKETS` in `english_suggestions.js` — letter-indexed with exam tags (zk/gk/cet4/cet6/ky/toefl/ielts/gre). |
+| Results capped at 20. | |
+
+### Coverage
+
+- English exact/prefix match: 100%
+- Chinese exact match: ~86% (14 modern synthetic words not in CC-CEDICT — see `.opencode/instructions/dictionary-coverage.md`)
+- Test: `python omo/dict_coverage_test.py`
 
 ## InputMethod component
 
-- Supports 3 screen shapes: `circle` (480×321 keyboard area), `rect` (rectangular), `pill-shaped` (capsule/跑道屏).
-- Keyboard modes: `QWERTY` (full) and `T9`.
-- Languages: Chinese (pinyin), English, Japanese (romaji→kana).
-- IME data lives in `src/components/InputMethod/assets/`: `dic.js` (pinyin→hanzi), `dic_jp.js` (romaji→kanji), `dicUtil.js` (orchestrator).
-- Emits events: `visibilityChange`, `keyDown`, `delete`, `complete`.
-- Variable-depth asset paths use `{{lang}}` etc. — this was fixed in `aiot-toolkit 2.0.4` (don't try to use static paths).
-
-## ADB deploy quirks
-
-- `deploy_watch.ps1` targets `emulator-5554` by default. Override: `-Serial 192.168.x.x:5555`.
-- Flow: build → find newest `.rpk` in `dist/` → `adb push` to `/data/app/com.watch.dic.rpk` → `adb shell pm install` → `adb shell am start` → verify via `am dump`.
-- The deploy script uses strict `$ErrorActionPreference = "Stop"` and exits on any failure.
+- English QWERTY keyboard only
+- Emits: `visibilityChange`, `keyDown`, `delete`, `complete`
+- Variable-depth asset paths use `{{lang}}` — `aiot-toolkit 2.0.4+` handles this; don't use static paths.
 
 ## Swipe-back gesture (every page)
 
-Copy-pasted pattern across all 7 pages:
-```js
-// Touch starts in left quarter (x ≤ 53), ends at right quarter (x ≥ 159),
-// mostly horizontal (Δy ≤ 120) → router.back()
-```
-If adding a new page, copy this gesture handler.
+| Page | Start X ≤ | End X ≥ | ΔY ≤ |
+|------|-----------|---------|------|
+| Most pages | 53 | 159 | 120 |
+| about.ux | 20 | 180 | 60 |
+
+If adding a page, copy the pattern from any page except about. Needs `getTouchPoint()` and `touchStartX/Y` state vars.
+
+## Router navigation quirks
+
+- **records → search** (history item click): uses `router.replace` (not push) with `queryParam` + `autoSearch="1"`.
+- **detail → results** (inflect button): uses `router.replace` (not push) to avoid stacking.
+- **Detail page**: 1s cooldown on inflect button, max 3 levels of depth.
 
 ## VSCode MCP
 
-`velajs-mcp` is configured in `.vscode/mcp.json` for debugging: tap, screenshot, input text, build, get device logs, navigate, etc.
+`velajs-mcp` in `.vscode/mcp.json` with auto-approved: tap, screenshot, navigate, input text, build, get device logs, storage inspect, etc.
 
-## Stylelint quirks
+## Emulator policy
 
-Custom Vela CSS properties that stylelint would flag — ignored via config:
-`placeholder-color`, `gradient-start`, `gradient-center`, `gradient-end`, `caret-color`, `selected-color`, `block-color`.
+**Do not touch the emulator unless the user explicitly asks.** Verification is the user's job (per `conventions.md`).
 
-Selector pseudo-class `:blur` is also ignored (not standard CSS).
+## Tests & CI
 
-## Build output
-
-- Build uses `rspack` (v1.7.12) under the hood via `aiot-toolkit`.
-- Output directory: `build/` (intermediate), `dist/` (final .rpk).
-- `build/` files are committed; `dist/` is gitignored.
-- `node` >= 8.10 required (very old floor — actual dev likely uses Node 20+).
-
-## CONVENTIONS (THIS PROJECT)
-
-| Rule | Detail |
-|------|--------|
-| **String quotes** | Double quotes only |
-| **Semicolons** | None |
-| **Trailing commas** | None |
-| **Indent** | 2 spaces |
-| **Print width** | 100 |
-| **Swipe-back gesture** | Every page: touch start x≤53, end x≥159, Δy≤120 → `router.back()` |
-| **Storage keys** | `dic_history` (max 20), `dic_favorites` (max 20) — plain JSON arrays |
-| **Result cap** | Dictionary search results never exceed 20 |
-| **Dictionary data** | Generated — never edit `src/common/dict/` shards manually |
-| **Screen** | Canvas 212×520px, background `#020813`, blue/white/black scheme |
-| **Router features** | `system.router`, `system.vibrator`, `system.device`, `system.file`, `system.storage` |
+- **Tests**: None. No test framework.
+- **CI**: None. No GitHub Actions.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
-- **Never edit dictionary shard files** under `src/common/dict/`. Run `python scripts/generate_watch_dict.py` to regenerate from CSV source.
-- **No static asset paths** with `{{lang}}` variables — `aiot-toolkit 2.0.4+` handles variable-depth paths; don't hardcode.
-- **No type suppression** — never use `as any`, `@ts-ignore`, `@ts-expect-error`.
+- **Never edit dictionary shard files** under `src/common/dict/`. Regenerate via `python scripts/generate_watch_dict.py`.
+- **No static asset paths** with `{{lang}}` — `aiot-toolkit 2.0.4+` handles variable-depth paths.
+- **No type suppression** — no `as any`, `@ts-ignore`, `@ts-expect-error`.
 - **No semicolons** — Prettier enforces no-semicolon style.
 - **No empty catch blocks** — always handle or re-throw.
-- **Don't remove swipe-back gesture** when adding new pages — copy the pattern from existing pages.
+- **Don't remove swipe-back gesture** when adding new pages.
 - **No generic AI boilerplate** — match project's telegraphic, no-fluff style.
+- **Don't override `designWidth`** — must stay `"device-width"` for the 212×520 canvas.
+- **ESLint runs with `--fix` by default** — it auto-formats on lint. Be aware before running `npm run lint`.
 
-## CODE MAP (from codegraph)
+## CODE MAP
 
 | Symbol | Type | File | Role |
 |--------|------|------|------|
-| `key_for()` | function | `scripts/generate_watch_dict.py:24` | Generate 2-char shard key for word |
-| `zh_bucket_for()` | function | `scripts/generate_watch_dict.py:43` | Unicode bucket for Chinese index |
-| `SimpleInputMethod` | object | `src/components/InputMethod/assets/dicUtil.js` | Pinyin→Hanzi + Romaji→Kana orchestration |
-
-## UNIQUE STYLES
-
-- **`.ux` files** parsed as Vue by Prettier (single-file components with `<template>` + `<script>` + `<style>`)
-- **Vela CSS properties** ignored by stylelint: `placeholder-color`, `gradient-start`, `gradient-center`, `gradient-end`, `caret-color`, `selected-color`, `block-color`
-- **`:blur` pseudo-class** also ignored by stylelint (not standard CSS)
-- **Commit types**: `bug`, `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `revert`, `merge`
+| `key_for()` | function | `scripts/generate_watch_dict.py:29` | Generate 2-char shard key for word |
+| `zh_bucket_for()` | function | `scripts/generate_watch_dict.py:48` | Unicode bucket for Chinese index |
+| `load_cc_cedict()` | function | `scripts/generate_watch_dict.py:67` | Parse CC-CEDICT into cn_index |
+| `SimpleInputMethod` | object | `src/components/InputMethod/assets/dicUtil.js` | English dict query orchestration |
+| `ENGLISH_SUGGESTION_BUCKETS` | object | `src/common/english_suggestions.js:1` | Letter-indexed word lists with exam tags |

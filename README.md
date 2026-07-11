@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/平台-Mi%20Band-1d74e8?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/框架-Vela%20QuickApp-1d74e8?style=flat-square" alt="Framework" />
   <img src="https://img.shields.io/badge/词库-14k%2B-2ea043?style=flat-square" alt="Headwords" />
-  <img src="https://img.shields.io/badge/输入-英%20%7C%20中%20%7C%20日-1d74e8?style=flat-square" alt="Languages" />
+  <img src="https://img.shields.io/badge/输入-英文-1d74e8?style=flat-square" alt="Languages" />
   <img src="https://img.shields.io/badge/工具-aiot--toolkit-ff6b35?style=flat-square" alt="Build" />
 </p>
 
@@ -20,7 +20,7 @@
 
 ## 简介
 
-**腕上词典** 是一款运行在小米手环上的 Vela 快应用，把一部完整的英汉词典装进手腕。查英语单词、汉字、动词变形、日语假名——全程离线，抬手即用。
+**腕上词典** 是一款运行在小米手环上的 Vela 快应用，把一部完整的英汉词典装进手腕。查英语单词、汉字、动词变形——全程离线，抬手即用。
 
 基于小米 `aiot-toolkit` 开发，内置 **14,942 条词汇**（数据源：ECDICT + BNC/COCA 词族），全部压缩在 212×520 像素的手环屏幕中。
 
@@ -28,8 +28,8 @@
 
 ## 功能
 
-- **🔍 三种查词模式** — 英语精确/前缀匹配、中文拼音输入查词、动词/形容词变形反查
-- **⌨️ 完整输入法** — QWERTY 全键盘、T9 九宫格、中文拼音输入法、日语罗马音→假名转换；适配药丸屏、圆形屏、矩形屏
+- **🔍 三种查词模式** — 英语精确/前缀匹配、汉字查词、动词/形容词变形反查
+- **⌨️ 完整输入法** — 全键盘英文输入，支持光标编辑和自动补全
 - **✨ 智能补全** — 按字母分桶的英语建议列表，标注考试等级（中考/高考/CET-4/CET-6/考研/TOEFL/IELTS/GRE）
 - **🌀 模糊搜索** — 基于编辑距离的容错匹配（最多 2 个差异），输错也能找到
 - **📖 变形查词** — 输入 `ran` → 找到 "run"，输入 `better` → 找到 "good"
@@ -102,7 +102,7 @@ src/
 │   ├── about/                    # 关于
 │   └── sponsor/                  # 赞赏
 ├── components/
-│   └── InputMethod/              # 完整输入法（QWERTY/T9，中/英/日，3 种屏形）
+│   └── InputMethod/              # 英文输入法（全键盘 + 光标控制）
 ├── common/
 │   ├── dict/                     # 词典分片（自动生成，请勿手动编辑）
 │   ├── english_suggestions.js    # 按字母分桶的英语补全列表
@@ -139,20 +139,9 @@ python scripts/generate_watch_dict.py
 
 ---
 
-## 输入法
-
-`InputMethod` 组件支持三种屏幕形状和三种语言：
-
-- **屏幕形状**：`pill-shaped`（药丸屏，默认）、`circle`（圆形屏，480×321 键盘区）、`rect`（矩形屏）
-- **键盘布局**：QWERTY 全键盘、T9 九宫格
-- **输入语言**：英语、中文（拼音→汉字）、日语（罗马音→假名）
-
-由 `dicUtil.js` 协调以下模块：
-
-- `dic.js` — 拼音→汉字映射
-- `dic_jp.js` — 罗马音→假名/汉字映射
-
 ---
+
+
 
 ## 技术栈
 
