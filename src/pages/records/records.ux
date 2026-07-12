@@ -33,11 +33,16 @@ export default {
     records: [],
     emptyText: "",
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    _destroyed: false
   },
 
   onInit() {
     this.loadRecords()
+  },
+
+  onDestroy() {
+    this._destroyed = true
   },
 
   onShow() {
@@ -54,9 +59,11 @@ export default {
     storage.get({
       key: key,
       success: (data) => {
+        if (this._destroyed) return
         this.records = this.buildRecords(this.parseList(data))
       },
       fail: () => {
+        if (this._destroyed) return
         this.records = []
       }
     })
@@ -160,6 +167,7 @@ export default {
         return list
       }
     } catch (err) {
+      console.log("[腕上词典] storage data parse failed:", err && err.message)
       return []
     }
     return []

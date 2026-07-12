@@ -89,7 +89,8 @@ export default {
     lastToastAt: 0,
     toastCooldown: 1500,
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    _destroyed: false
   },
 
   onInit() {
@@ -834,11 +835,13 @@ export default {
       uri: uri,
       encoding: "utf-8",
       success: (data) => {
+        if (this._destroyed) return
         const text = data && data.text ? data.text : ""
         this.fileCache.set(uri, text)
         done(text)
       },
       fail: () => {
+        if (this._destroyed) return
         this.fileCache.set(uri, "")
         done("")
       }
@@ -850,7 +853,7 @@ export default {
   },
 
   isEnglishWord(value) {
-    return /^[a-z][a-z'-]*$/.test(value || "")
+    return /^[a-z][a-z'-]{0,20}$/.test(value || "")
   },
 
   showToast(message) {
@@ -863,6 +866,13 @@ export default {
       message: message,
       duration: 1500
     })
+  },
+
+  onDestroy() {
+    this._destroyed = true
+    this.fileCache = null
+    this.entryCache = null
+    this.cnIndexCache = null
   },
 
   hasChinese(value) {

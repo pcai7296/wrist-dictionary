@@ -293,6 +293,43 @@ import vibrator from "@system.vibrator";
 import device from '@system.device'
 import { SimpleInputMethod } from "./assets/dicUtil.js";
 import {getSuggestionSeed, getSuggestions, onSuggestionsChange} from "../../common/suggestionState"
+const KEY_MAPS = {
+  full: [
+    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+    ["Z", "X", "C", "V", "B", "N", "M"]
+  ],
+  sign: [
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    ["~", "!", "@", "#", "%", "\u201c", "\u201d", "*", "?", "/"],
+    ["(", ")", "-", "_", ":", ";", "\uff0c", "\u3002", "."]
+  ],
+  sign_jp: [
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    ["~", "\u2022", "@", "#", "%", "\u300c", "\u300d", "*", "?", "/"],
+    ["(", ")", "-", "\u2026", ":", ";", "\u3001", "\u3002", "!"]
+  ],
+  sign62: [
+    ["2", "3", "4", "5", "6", "7", "8", "9"],
+    ["!", "@", "#", "%", "\u201c", "\u201d", "*"],
+    [")", "-", "_", ":", ";"]
+  ],
+  sign62_jp: [
+    ["2", "3", "4", "5", "6", "7", "8", "9"],
+    ["\u2022", "@", "#", "%", "\u300c", "\u300d", "*"],
+    [")", "-", "\u2026", ":", ";"]
+  ],
+  full62: [
+    ["W", "E", "R", "T", "Y", "U", "I", "O"],
+    ["S", "D", "F", "G", "H", "J", "K"],
+    ["X", "C", "V", "B", "N"]
+  ],
+  t9: [
+    ["abc", "def"],
+    ["ghi", "jkl", "mno"],
+    ["pqrs", "tuv", "wxyz"]
+  ]
+}
 function doSearchDic(word, lang, cb) {
   if (!word) {
     cb([]);
@@ -345,43 +382,7 @@ export default {
     // 针对screenShape为rect的设备，会自动获取screenWidth并绑定到根div
     // 这样便能同时适配n67和o65甚至是后续设备，但实际效果可能受designWidth影响
     screenWidth: 336,
-    keys: {
-      full: [
-        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-        ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-        ["Z", "X", "C", "V", "B", "N", "M"],
-      ],
-      sign: [
-        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-        ["~", "!", "@", "#", "%", "“", "”", "*", "?", "/"],
-        ["(", ")", "-", "_", ":", ";", "，", "。", "."],
-      ],
-      sign_jp: [
-        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-        ["~", "•", "@", "#", "%", "「", "」", "*", "?", "/"],
-        ["(", ")", "-", "…", ":", ";", "、", "。", "!"],
-      ],
-      sign62: [
-        ["2", "3", "4", "5", "6", "7", "8", "9"],
-        ["!", "@", "#", "%", "“", "”", "*"],
-        [")", "-", "_", ":", ";"],
-      ],
-      sign62_jp: [
-        ["2", "3", "4", "5", "6", "7", "8", "9"],
-        ["•", "@", "#", "%", "「", "」", "*"],
-        [")", "-", "…", ":", ";"],
-      ],
-      full62: [
-        ["W", "E", "R", "T", "Y", "U", "I", "O"],
-        ["S", "D", "F", "G", "H", "J", "K"],
-        ["X", "C", "V", "B", "N"],
-      ],
-      t9: [
-        ["abc", "def"],
-        ["ghi", "jkl", "mno"],
-        ["pqrs", "tuv", "wxyz"],
-      ],
-    },
+    keys: KEY_MAPS,
   },
   onInit() {
     if (this.lang !== "cn" && this.lang !== "en") {
@@ -406,6 +407,12 @@ export default {
         this.resetReslutList()
       }
     }.bind(this))
+  },
+  onDestroy() {
+    this.$unwatch("hide")
+    this.$unwatch("maxlength")
+    this.$unwatch("keyboardtype")
+    onSuggestionsChange(null)
   },
   addAllTxt(txt) {
     this.$emit("complete", { content: txt });

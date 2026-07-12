@@ -77,7 +77,8 @@ export default {
     lastToastAt: 0,
     toastCooldown: 1500,
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    _destroyed: false
   },
 
   onInit() {
@@ -93,6 +94,10 @@ export default {
         this.performSearch()
       }, 200)
     }
+  },
+
+  onDestroy() {
+    this._destroyed = true
   },
 
   toggleKeyboard() {
@@ -221,10 +226,12 @@ export default {
     storage.get({
       key: "dic_history",
       success: (data) => {
+        if (this._destroyed) return
         const list = this.parseList(data)
         this.writeHistoryList(list, item)
       },
       fail: () => {
+        if (this._destroyed) return
         this.writeHistoryList([], item)
       }
     })
@@ -255,6 +262,7 @@ export default {
         return list
       }
     } catch (err) {
+      console.log('[腕上词典] storage data parse failed:', err && err.message)
       return []
     }
     return []
@@ -427,7 +435,7 @@ export default {
   },
 
   isEnglishWord(value) {
-    return /^[a-z][a-z'-]*$/.test(value || "")
+    return /^[a-z][a-z'-]{0,20}$/.test(value || "")
   },
 
   hasEnglish(value) {
