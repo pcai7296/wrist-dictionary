@@ -37,8 +37,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -64,7 +65,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
@@ -93,5 +94,25 @@ export default {
   width: 188px;
   height: 188px;
   margin-top: 68px;
+}
+
+@media (shape: circle) {
+  .page {
+    justify-content: center;
+  }
+  .sponsor-code {
+    width: 160px;
+    height: 160px;
+    margin-top: 24px;
+  }
+}
+
+@media (shape: rect) {
+  .page {
+    justify-content: center;
+  }
+  .sponsor-code {
+    margin-top: 24px;
+  }
 }
 </style>

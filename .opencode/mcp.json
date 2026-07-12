@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "figma": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "figma-developer-mcp",
+        "--figma-api-key=figd_N6e7kD-VqSmY0sh5kuLesVTGharnWo38EjVZTxLA",
+        "--stdio"
+      ]
+    },
+    "mcpollinations": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pinkpixel/mcpollinations"
+      ]
+    }
+  }
+}

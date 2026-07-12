@@ -1,5 +1,7 @@
 import csv
+import gzip
 import json
+import os
 import re
 import shutil
 import xml.etree.ElementTree as ET
@@ -11,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "data" / "ecdict_tagged_14942_compact.csv"
 WORD_FAMILY_SOURCE = ROOT / "data" / "bnc_coca_word_family_lists_v2.xlsx"
 WORD_FAMILY_SOURCE_URL = "https://www.eapfoundation.com/vocab/general/bnccoca/"
+CCEDICT_SOURCE = ROOT / "data" / "cedict.txt.gz"
+CCEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz"
 OUT = ROOT / "src" / "common" / "dict"
 ENTRY_SHARD_SIZE = 500
 ZH_BUCKET_COUNT = 64
@@ -43,6 +47,66 @@ def key_for(value):
 
 def normalize_chinese(value):
     return "".join(re.findall(r"[\u4e00-\u9fff]", value or ""))
+
+
+# CC-CEDICT English stop words — words too generic to form useful zh→en mappings
+CC_STOP_WORDS = {
+    "the", "this", "that", "these", "those", "a", "an", "is", "are",
+    "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "will", "would", "can", "could", "may", "might",
+    "shall", "should", "to", "of", "in", "on", "at", "for", "with",
+    "by", "from", "as", "but", "or", "and", "not", "no", "nor",
+    "it", "its", "he", "him", "she", "her", "they", "them", "we", "us",
+    "you", "your", "my", "me", "our", "all", "each", "every", "some",
+    "any", "one", "two", "etc", "ie", "eg", "vs", "aka", "vs",
+    "cl", "lit", "fig", "coll", "slang", "arch", "dial", "old",
+    "x", "etc", "de", "en", "la", "le", "el",
+}
+
+
+def load_cc_cedict(path):
+    """Parse CC-CEDICT, return dict: simplified Chinese phrase → [English meanings]"""
+    if not path.exists():
+        print(f"  [CC-CEDICT] 文件不存在: {path}")
+        print(f"  [CC-CEDICT] 请下载: {CCEDICT_URL}")
+        print(f"  [CC-CEDICT] 保存到: {path}")
+        return {}
+
+    result = {}
+    with gzip.open(str(path), "rt", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            # Parse: Traditional Simplified [pin1 yin1] /meaning1/meaning2/
+            bracket = line.find("[")
+            slash = line.find("/")
+            if bracket < 0 or slash < 0:
+                continue
+
+            chinese_part = line[:bracket].strip()
+            trad_simp = chinese_part.split()
+            if len(trad_simp) < 2:
+                continue
+
+            simplified = trad_simp[1]
+            cn_chars = "".join(re.findall(r"[\u4e00-\u9fff]+", simplified))
+            if len(cn_chars) < 2:
+                continue
+
+            # Extract English meanings
+            english_text = line[slash:]  # /meaning1/meaning2/
+            meanings = [
+                m.strip() for m in english_text.split("/") if m.strip()
+            ]
+
+            if cn_chars in result:
+                result[cn_chars].extend(meanings)
+            else:
+                result[cn_chars] = meanings
+
+    return result
 
 
 def zh_bucket_for(char):
@@ -235,6 +299,7 @@ def main():
     (OUT / "entries").mkdir(parents=True)
     (OUT / "zh_index").mkdir(parents=True)
     (OUT / "inflect_reverse").mkdir(parents=True)
+    (OUT / "cn_index").mkdir(parents=True)
 
     word_shards = {}
     first_index = {}
@@ -338,6 +403,62 @@ def main():
             )
         (OUT / "entries" / f"entry_{shard}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    # Build cn_index: Chinese phrase → entry IDs (from ECDICT translations)
+    cn_index = {}
+    for entry_id, row in enumerate(rows):
+        zh_text = normalize_chinese(row["translation"])
+        # Clean: remove brackets content, English, digits
+        cleaned = re.sub(r'\[.*?\]', '', row["translation"])
+        cleaned = re.sub(r'[a-zA-Z0-9]', '', cleaned)
+        # Split by common separators
+        parts = re.split(r'[,，;；\s\r\n/\\\\]+', cleaned)
+        for phrase in parts:
+            phrase = phrase.strip()
+            if len(phrase) >= 2 and bool(re.search(r'[\u4e00-\u9fff]', phrase)):
+                bucket = zh_bucket_for(phrase[0])
+                cn_index.setdefault(bucket, {}).setdefault(phrase, set()).add(entry_id)
+
+    # Augment cn_index with CC-CEDICT (Chinese → English reverse lookup)
+    ccedict = load_cc_cedict(CCEDICT_SOURCE)
+    ccedict_added = 0
+    if ccedict:
+        # Build word → entry_id reverse map
+        word_to_entry = {}
+        for entry_id, row in enumerate(rows):
+            word_lower = row["word"].lower()
+            word_to_entry[word_lower] = entry_id
+
+        ccedict_added = 0
+        for phrase, meanings in ccedict.items():
+            # Extract English content words from all meanings
+            matched_ids = set()
+            for meaning in meanings:
+                # Remove CL: patterns and parentheticals
+                cleaned = re.sub(r'CL:[^/]+', '', meaning)
+                cleaned = re.sub(r'\([^)]*\)', '', cleaned)
+                words = re.findall(r"[a-zA-Z]+", cleaned.lower())
+                for w in words:
+                    if len(w) >= 3 and w not in CC_STOP_WORDS and w in word_to_entry:
+                        matched_ids.add(word_to_entry[w])
+
+            if matched_ids:
+                ccedict_added += 1
+                bucket = zh_bucket_for(phrase[0])
+                cn_index.setdefault(bucket, {}).setdefault(phrase, set()).update(matched_ids)
+
+        print(f"  [CC-CEDICT] 已合并 {ccedict_added} 个中文词组")
+    else:
+        print("  [CC-CEDICT] 跳过（文件未找到）")
+
+    cn_phrase_count = 0
+    for bucket in sorted(cn_index):
+        lines = []
+        for phrase in sorted(cn_index[bucket]):
+            ids = ",".join(str(eid) for eid in sorted(cn_index[bucket][phrase]))
+            lines.append(f"{phrase}\t{ids}")
+            cn_phrase_count += 1
+        (OUT / "cn_index" / f"cn_{bucket}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
     zh_char_count = 0
     for bucket, chars in sorted(zh_index.items()):
         lines = []
@@ -367,6 +488,10 @@ def main():
         "entryShardSize": ENTRY_SHARD_SIZE,
         "zhBuckets": len(zh_index),
         "zhChars": zh_char_count,
+        "cnIndexBuckets": len(cn_index),
+        "cnIndexPhrases": cn_phrase_count,
+        "ccCedictSource": str(CCEDICT_SOURCE) if CCEDICT_SOURCE.exists() else "",
+        "ccCedictMerged": ccedict_added,
         "resultLimit": 20,
     }
     (OUT / "meta.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -1,8 +1,39 @@
 <script>
+import device from "@system.device"
+
 export default {
+  data: {
+    screenShape: "pill-shaped",
+    screenWidth: 212,
+    screenHeight: 520
+  },
+
   onCreate() {
     console.log("app created")
+    const appData = this.data
+    device.getInfo({
+      success: (data) => {
+        if (data.screenShape) {
+          appData.screenShape = data.screenShape
+        }
+        if (data.screenWidth) {
+          appData.screenWidth = data.screenWidth
+        }
+        if (data.screenHeight) {
+          appData.screenHeight = data.screenHeight
+        }
+        console.log(
+          "screen: shape=" + appData.screenShape +
+          " width=" + appData.screenWidth +
+          " height=" + appData.screenHeight
+        )
+      },
+      fail: (data, code) => {
+        console.log("device.getInfo failed: " + code)
+      }
+    })
   },
+
   onDestroy() {
     console.log("app destroyed")
   }

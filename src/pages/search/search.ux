@@ -20,8 +20,6 @@
       hide="{{ keyboardHidden }}"
       keyboardtype="{{ keyboardType }}"
       maxlength="5"
-      englishseed="{{ englishSeed }}"
-      englishsuggestions="{{ englishSuggestionsText }}"
       vibratemode="{{ vibrateMode }}"
       screentype="{{ screenType }}"
       @visibility-change="onVisibilityChange"
@@ -36,6 +34,7 @@
 import router from "@system.router"
 import storage from "@system.storage"
 import prompt from "@system.prompt"
+import {setSuggestionSeed, setSuggestions} from "../../common/suggestionState"
 import {ENGLISH_SUGGESTION_BUCKETS} from "../../common/english_suggestions.js"
 
 const ENGLISH_SUFFIXES = [
@@ -73,8 +72,8 @@ export default {
     englishSuggestionsText: "",
     keyboardHidden: false,
     keyboardType: "QWERTY",
-    vibrateMode: "short",
     screenType: "pill-shaped",
+    vibrateMode: "short",
     lastToastAt: 0,
     toastCooldown: 1500,
     touchStartX: -1,
@@ -82,6 +81,7 @@ export default {
   },
 
   onInit() {
+    this.screenType = this.$app.$def.data.screenShape || "pill-shaped"
     if (this.queryParam) {
       this.query = this.queryParam
       this.cursorIndex = this.query.length
@@ -274,8 +274,10 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const appData = (this.$app && this.$app.$def && this.$app.$def.data) || {}
+    const sw = appData.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -334,6 +336,8 @@ export default {
     const normalized = this.normalizeEnglishSeed(seed)
     if (!normalized) {
       this.englishSuggestionsText = ""
+      setSuggestionSeed("")
+      setSuggestions("")
       return
     }
 
@@ -342,7 +346,10 @@ export default {
     const items = []
     const seen = {}
     this.scanEnglishSuggestionRows(rows, normalized, items, seen)
-    this.englishSuggestionsText = this.buildEnglishSuggestions(normalized, items, seen).join("|")
+    const suggestions = this.buildEnglishSuggestions(normalized, items, seen).join("|")
+    this.englishSuggestionsText = suggestions
+    setSuggestionSeed(normalized)
+    setSuggestions(suggestions)
   },
 
   scanEnglishSuggestionRows(rows, seed, items, seen) {
@@ -452,7 +459,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;

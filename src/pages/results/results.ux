@@ -40,6 +40,35 @@ import prompt from "@system.prompt"
 const FUZZY_SCAN_LIMIT = 4000
 const FUZZY_POOL_LIMIT = 80
 
+class LRUCache {
+  constructor(max) {
+    this.max = max
+    this.cache = {}
+    this.order = []
+  }
+  get(key) {
+    if (this.cache[key] === undefined) return undefined
+    var idx = this.order.indexOf(key)
+    if (idx >= 0) {
+      this.order.splice(idx, 1)
+      this.order.push(key)
+    }
+    return this.cache[key]
+  }
+  set(key, val) {
+    if (this.cache[key] !== undefined) {
+      var idx = this.order.indexOf(key)
+      if (idx >= 0) this.order.splice(idx, 1)
+    }
+    this.cache[key] = val
+    this.order.push(key)
+    if (this.order.length > this.max) {
+      var oldest = this.order.shift()
+      delete this.cache[oldest]
+    }
+  }
+}
+
 export default {
   protected: {
     query: "",
@@ -53,8 +82,9 @@ export default {
     resultCards: [],
     searchToken: 0,
     shardIndex: null,
-    fileCache: {},
-    entryCache: {},
+    fileCache: null,
+    entryCache: null,
+    cnIndexCache: null,
     fuzzyWordsChecked: 0,
     lastToastAt: 0,
     toastCooldown: 1500,
@@ -63,6 +93,9 @@ export default {
   },
 
   onInit() {
+    this.fileCache = new LRUCache(5)
+    this.entryCache = new LRUCache(3)
+    this.cnIndexCache = new LRUCache(10)
     this.queryText = this.normalizeWord(this.query)
     this.performSearch()
   },
@@ -105,7 +138,17 @@ export default {
     this.statusText = "搜索中"
 
     if (this.hasChinese(normalized)) {
-      this.performChineseSearch(normalized, token)
+      this.collectCn2EnResults(normalized, [], {}, (cnResults) => {
+        if (token !== this.searchToken) {
+          return
+        }
+        if (cnResults.length > 0) {
+          this.resultCards = cnResults.slice(0, 20)
+          this.statusText = cnResults.length >= 20 ? "最多显示20条" : ""
+        } else {
+          this.performChineseSearch(normalized, token)
+        }
+      })
       return
     }
 
@@ -251,9 +294,112 @@ export default {
     })
   },
 
+  loadCnIndex(bucket, done) {
+    const cached = this.cnIndexCache.get(bucket)
+    if (cached) {
+      done(cached)
+      return
+    }
+
+    this.readText("/common/dict/cn_index/cn_" + bucket + ".txt", (text) => {
+      const indexMap = {}
+      const lines = text.split("\n")
+      for (let i = 0; i < lines.length; i++) {
+        const parts = lines[i].split("\t")
+        if (parts.length >= 2) {
+          indexMap[parts[0]] = parts[1].split(",")
+        }
+      }
+      this.cnIndexCache.set(bucket, indexMap)
+      done(indexMap)
+    })
+  },
+
+  collectCn2EnResults(query, results, seen, done) {
+    const firstChar = this.getFirstChineseChar(query)
+    if (!firstChar) {
+      done(results)
+      return
+    }
+
+    const bucket = this.zhBucketFor(firstChar)
+    this.loadCnIndex(bucket, (indexMap) => {
+      let ids = indexMap[query]
+
+      // Prefix match fallback: max 20 candidate keys, 10 IDs per key, 50 total
+      if (!ids) {
+        const candidates = Object.keys(indexMap)
+          .filter(key => key.indexOf(query) === 0)
+          .slice(0, 20)
+
+        const allIds = []
+        const idSeen = {}
+        for (let i = 0; i < candidates.length; i++) {
+          const idList = indexMap[candidates[i]] || []
+          const limited = idList.slice(0, 10)
+          for (let j = 0; j < limited.length; j++) {
+            if (!idSeen[limited[j]]) {
+              idSeen[limited[j]] = true
+              allIds.push(limited[j])
+            }
+          }
+        }
+        ids = allIds.slice(0, 50)
+      } else {
+        ids = ids.slice(0, 50)
+      }
+
+      if (!ids || ids.length === 0) {
+        done(results)
+        return
+      }
+
+      this.fetchEntriesByIds(ids, results, seen, 0, done)
+    })
+  },
+
+  fetchEntriesByIds(ids, results, seen, index, done) {
+    if (index >= ids.length || results.length >= 20) {
+      done(results)
+      return
+    }
+
+    const entryId = this.parseEntryId(ids[index])
+    if (entryId < 0) {
+      this.fetchEntriesByIds(ids, results, seen, index + 1, done)
+      return
+    }
+
+    const shard = this.entryShardFor(entryId)
+    this.loadEntryShard(shard, (entries) => {
+      let nextIndex = index
+      while (nextIndex < ids.length && results.length < 20) {
+        const nextId = this.parseEntryId(ids[nextIndex])
+        if (nextId < 0 || this.entryShardFor(nextId) !== shard) {
+          break
+        }
+
+        const item = entries[nextId]
+        if (item) {
+          const lower = this.normalizeWord(item.word)
+          if (!seen[lower]) {
+            seen[lower] = true
+            results.push(
+              this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
+            )
+          }
+        }
+        nextIndex++
+      }
+
+      this.fetchEntriesByIds(ids, results, seen, nextIndex, done)
+    })
+  },
+
   loadEntryShard(shard, done) {
-    if (this.entryCache[shard]) {
-      done(this.entryCache[shard])
+    const cached = this.entryCache.get(shard)
+    if (cached) {
+      done(cached)
       return
     }
 
@@ -271,7 +417,7 @@ export default {
           }
         }
       }
-      this.entryCache[shard] = entries
+      this.entryCache.set(shard, entries)
       done(entries)
     })
   },
@@ -569,7 +715,8 @@ export default {
   },
 
   createResultCard(id, word, phonetic, translation, tag) {
-    const lines = this.wrapText(translation || "", 168)
+    const maxW = (this.$app.$def.data.screenWidth || 212) - 44
+    const lines = this.wrapText(translation || "", maxW)
     const safeLines = lines.length > 0 ? lines : [""]
     const lineHeight = 22
     const cardHeight = Math.max(100, 64 + safeLines.length * lineHeight)
@@ -677,8 +824,9 @@ export default {
   },
 
   readText(uri, done) {
-    if (this.fileCache[uri]) {
-      done(this.fileCache[uri])
+    const cached = this.fileCache.get(uri)
+    if (cached !== undefined) {
+      done(cached)
       return
     }
 
@@ -687,11 +835,11 @@ export default {
       encoding: "utf-8",
       success: (data) => {
         const text = data && data.text ? data.text : ""
-        this.fileCache[uri] = text
+        this.fileCache.set(uri, text)
         done(text)
       },
       fail: () => {
-        this.fileCache[uri] = ""
+        this.fileCache.set(uri, "")
         done("")
       }
     })
@@ -815,8 +963,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -842,11 +991,28 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
   align-items: center;
+}
+
+@media (shape: circle) {
+  .page {
+    padding-top: 12px;
+    justify-content: center;
+  }
+  .back-button {
+    width: 70px;
+    height: 48px;
+  }
+}
+
+@media (shape: rect) {
+  .page {
+    justify-content: center;
+  }
 }
 
 .back-button {

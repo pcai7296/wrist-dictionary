@@ -9,7 +9,7 @@
           <div style="position: absolute;top:38px;left:78px;width:324px;height:52px;background-color:rgb(38,38,38);border-radius: 12px;border: 3px solid #333333" show="{{downFlag===''&& !numFlag}}"></div>
           <img show="{{resultList.length > 0}}" style="position: absolute;top:43px;left:355px;" src="./assets/full/down.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
-          <img src="./assets/full/{{lang}}.png" style="position: absolute;top:38px;left:7px;width:67px;height:52px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag}}" />
+          <img src="/components/InputMethod/assets/full/{{lang}}.png" style="position: absolute;top:38px;left:7px;width:67px;height:52px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag}}" />
           <div style="position: absolute;top:-4px;left:78px;width:324px;" show="{{downFlag==='' && !numFlag && cval}}">
             <text class="caltext" style="width:296px;"> {{cval}}_ </text>
           </div>
@@ -71,7 +71,7 @@
           <div style="position: absolute;top:35px;left:95px;width:290px;height:60px;background-color:rgb(38,38,38);border-radius: 999px;border: 3px solid #333333" show="{{downFlag===''&& !numFlag}}"></div>
           <img show="{{resultList.length > 0}}" style="position: absolute;top:44px;left:338px;" src="./assets/full/down.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
-          <img src="./assets/t9/{{lang}}.png" style="position: absolute;top:35px;left:31px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag}}" />
+          <img src="/components/InputMethod/assets/t9/{{lang}}.png" style="position: absolute;top:35px;left:31px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag}}" />
           <div style="position: absolute;top:-4px;left:95px;width:145px;height:40px;" show="{{downFlag==='' && !numFlag && cval}}">
             <text class="caltext" style="width:145px;"> {{cval}}_ </text>
           </div>
@@ -267,7 +267,7 @@
           </scroll>
           <img show="{{resultList.length > 0}}" style="position: absolute;left: 120px;top: 57px;width: 60px;height: 40px;" src="./assets/arc/down2.png" @click="onBtnClick('down')" />
           <!-- 带变量的相对路径在 aiot-tookit 2.0.4 中修复 -->
-          <img src="./assets/arc/{{lang}}.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('lang')" show="{{downFlag==='' && !numFlag && !numFlag_jp}}" />
+          <img src="/components/InputMethod/assets/arc/{{lang}}.png" style="position: absolute;top:0px;left:9px;width: 48px;height: 42px;" @click="onBtnClick('lang')" show="{{downFlag==='' && !numFlag && !numFlag_jp}}" />
           <img src="./assets/arc/del.png" style="position: absolute;left: 135px;top: 0px;width: 48px;height: 42px;" @click="onBtnClick('D')" />
         </div>
         <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
@@ -292,6 +292,7 @@
 import vibrator from "@system.vibrator";
 import device from '@system.device'
 import { SimpleInputMethod } from "./assets/dicUtil.js";
+import {getSuggestionSeed, getSuggestions, onSuggestionsChange} from "../../common/suggestionState"
 function doSearchDic(word, lang, cb) {
   if (!word) {
     cb([]);
@@ -318,12 +319,6 @@ export default {
     },
     maxlength: {
       default: 5,
-    },
-    englishseed: {
-      default: "",
-    },
-    englishsuggestions: {
-      default: "",
     },
     vibratemode: {
       default: "",
@@ -406,8 +401,11 @@ export default {
     this.$watch("hide", "watchHidePropsChange");
     this.$watch("maxlength", "watchMaxLengthPropsChange");
     this.$watch("keyboardtype", "watchKeyboardTypePropsChange");
-    this.$watch("englishseed", "watchEnglishSeedPropsChange");
-    this.$watch("englishsuggestions", "watchEnglishSuggestionsPropsChange");
+    onSuggestionsChange(function () {
+      if (this.lang === "en") {
+        this.resetReslutList()
+      }
+    }.bind(this))
   },
   addAllTxt(txt) {
     this.$emit("complete", { content: txt });
@@ -416,7 +414,7 @@ export default {
     this.onVibrate();
     let content = txt;
     if (this.lang === "en") {
-      const seed = this.normalizeEnglishSeed(this.englishseed);
+      const seed = this.normalizeEnglishSeed(getSuggestionSeed());
       const word = this.normalizeEnglishSeed(txt);
       if (seed && word.indexOf(seed) === 0 && word.length > seed.length) {
         content = word.slice(seed.length);
@@ -537,7 +535,7 @@ export default {
       watingStr = this.lastWaitingStr[this.waitingIndex];
     }
     if (this.lang === "en") {
-      this.getEnglishResults(this.englishseed);
+      this.getEnglishResults(getSuggestionSeed());
       return;
     }
     if (!(this.cval + watingStr) || this.lang !== "cn") {
@@ -576,7 +574,7 @@ export default {
       this.setResultListAll();
       return;
     }
-    this.resultList = this.parseEnglishSuggestions(this.englishsuggestions);
+    this.resultList = this.parseEnglishSuggestions(getSuggestions());
     this.setResultListAll();
   },
   onSelect(num) {
@@ -605,10 +603,10 @@ export default {
     this.clearWaiting();
     this.resetReslutList();
   },
-  watchHidePropsChange(newV, oldV) {
+  watchHidePropsChange(newV) {
     this.$emit("visibilityChange", { visible: !newV });
   },
-  watchMaxLengthPropsChange(newV, oldV) {
+  watchMaxLengthPropsChange(newV) {
     if (newV) {
       const tempCvalList = [];
       for (let i = 0; i < newV; i++) {
@@ -617,22 +615,12 @@ export default {
       this.cvalList = tempCvalList;
     }
   },
-  watchKeyboardTypePropsChange(newV, oldV) {
+  watchKeyboardTypePropsChange() {
     if (this.lang !== "cn" && this.lang !== "en") {
       this.lang = "cn";
       this.numFlag_jp = false;
       this.cval = "";
       this.clearWaiting();
-      this.resetReslutList();
-    }
-  },
-  watchEnglishSeedPropsChange(newV, oldV) {
-    if (this.lang === "en" && newV !== oldV) {
-      this.resetReslutList();
-    }
-  },
-  watchEnglishSuggestionsPropsChange(newV, oldV) {
-    if (this.lang === "en" && newV !== oldV) {
       this.resetReslutList();
     }
   },

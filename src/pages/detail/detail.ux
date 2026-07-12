@@ -60,7 +60,8 @@ export default {
     this.phoneticText = this.phonetic ? "/" + this.phonetic + "/" : ""
     this.translationText = this.translation || ""
     this.tagText = this.tag || ""
-    this.translationLines = this.wrapText(this.translationText, 164)
+    const wrapW = (this.$app.$def.data.screenWidth || 212) - 48
+    this.translationLines = this.wrapText(this.translationText, wrapW)
     if (this.translationLines.length === 0) {
       this.translationLines = [""]
     }
@@ -422,8 +423,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -449,11 +451,37 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
   align-items: center;
+}
+
+@media (shape: circle) {
+  .page {
+    padding-top: 12px;
+    justify-content: center;
+  }
+  .back-button {
+    width: 70px;
+    height: 48px;
+  }
+  .meaning-list {
+    width: 170px;
+  }
+  .meaning-item {
+    width: 170px;
+  }
+  .detail-card {
+    width: 170px;
+  }
+}
+
+@media (shape: rect) {
+  .page {
+    justify-content: center;
+  }
 }
 
 .back-button {

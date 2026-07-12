@@ -26,6 +26,16 @@ This loads the full Vela QuickApp development skill with official documentation,
 | `ui-ux-design` | Design patterns for wearable UIs |
 | `JavaScript` | Writing robust JS for .ux scripts |
 
+## Before Writing Code — Check Official Docs
+
+**Before writing any `.ux`, `.js`, or `manifest.json` code, ALWAYS check the official Vela QuickApp documentation first:**
+
+```
+https://iot.mi.com/vela/quickapp/
+```
+
+This is the authoritative source for component attributes, API signatures, manifest schema, framework behavior, and template/event/CSS rules. Do not rely on assumptions or training data — verify against the official site.
+
 ## Exception
 
 If the task is **pure code reading/explanation only** (no editing, no building, no debugging), the skill is not required but still recommended for context.

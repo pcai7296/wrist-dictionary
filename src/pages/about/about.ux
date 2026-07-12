@@ -5,20 +5,11 @@
     </div>
 
     <list class="about-list">
-      <list-item type="card" class="list-item" style="height: 210px;">
+      <list-item type="card" class="list-item" style="height: 250px;">
         <div class="app-card">
           <text class="app-name">腕上词典</text>
           <text class="app-version">1.0</text>
-          <div class="mini-icon">
-            <div class="mini-left">
-              <div class="mini-line short"></div>
-              <div class="mini-line"></div>
-            </div>
-            <div class="mini-right">
-              <div class="mini-mark"></div>
-              <div class="mini-line right-line"></div>
-            </div>
-          </div>
+          <img class="deco-icon-about" src="/common/deco-icon-about.png" />
         </div>
       </list-item>
 
@@ -35,29 +26,61 @@
       <list-item type="license" class="list-item" style="height: 110px;">
         <div class="section-inner">
           <text class="section-title">词库来源</text>
-          <text class="license-line">ECDICT / MIT</text>
+          <text class="license-line">ECDICT (MIT)</text>
+          <text class="license-line">CC-CEDICT</text>
           <text class="license-line">BNC/COCA 词族表</text>
         </div>
       </list-item>
 
-      <list-item type="usage" class="list-item" style="height: 400px;">
+      <list-item type="usage" class="list-item" style="height: 520px;">
         <div class="section-inner">
           <text class="section-title">使用说明</text>
-          <text class="desc-line">1. 首页选择"查找变形"查询单词的形态变化</text>
-          <text class="desc-line">2. "中英查找"直接搜索英文或中文单词</text>
-          <text class="desc-line">3. 点击结果卡片查看详细释义和变形</text>
-          <text class="desc-line">4. 搜索历史自动保存，可随时查看</text>
-          <text class="desc-line">5. 单词详情页可添加到收藏</text>
+          <text class="desc-line">1. 首页→"查找变形"</text>
+          <text class="desc-line" style="margin-top: 0px;">   输入词根查屈折变化</text>
+          <text class="desc-line">2. 首页→"中英查找"</text>
+          <text class="desc-line" style="margin-top: 0px;">   搜英文或中文得释义</text>
+          <text class="desc-line">3. 点击结果卡片看详细释义</text>
+          <text class="desc-line">4. 详情页可添加到收藏复习</text>
+          <text class="desc-line">5. 搜索历史存于"历史记录"</text>
         </div>
       </list-item>
 
-      <list-item type="limits" class="list-item" style="height: 320px;">
+      <list-item type="limits" class="list-item" style="height: 340px;">
         <div class="section-inner">
           <text class="section-title">使用限制</text>
-          <text class="desc-line">• 本地词库约15,000词，专业词汇可能未收录</text>
-          <text class="desc-line">• 每次搜索最多显示20条结果</text>
-          <text class="desc-line">• 中文搜索仅支持单字索引，长句效果有限</text>
-          <text class="desc-line">• 首次使用需等待词库加载</text>
+          <text class="desc-line">• 约15,000词 + 12万中文词组，专有词可能未收录</text>
+          <text class="desc-line">• 每次搜索最多20条结果，模糊最多80候补</text>
+          <text class="desc-line">• 中文搜索需精确匹配，长句效果有限</text>
+          <text class="desc-line">• 中文搜索耗时较长，请稍候</text>
+        </div>
+      </list-item>
+
+      <list-item type="tags" class="list-item" style="height: 320px;">
+        <div class="section-inner">
+          <text class="section-title">标签缩写</text>
+          <text class="desc-line">zk    中考词汇</text>
+          <text class="desc-line">gk    高考词汇</text>
+          <text class="desc-line">cet4  大学英语四级</text>
+          <text class="desc-line">cet6  大学英语六级</text>
+          <text class="desc-line">ky    考研词汇</text>
+          <text class="desc-line">toefl 托福</text>
+          <text class="desc-line">ielts 雅思</text>
+          <text class="desc-line">gre   GRE</text>
+        </div>
+      </list-item>
+
+      <list-item type="pos" class="list-item" style="height: 380px;">
+        <div class="section-inner">
+          <text class="section-title">词性对照</text>
+          <text class="desc-line">n.    名词</text>
+          <text class="desc-line">v.    动词 (vt.及物 / vi.不及物)</text>
+          <text class="desc-line">a.    形容词</text>
+          <text class="desc-line">adv.  副词</text>
+          <text class="desc-line">pron. 代词</text>
+          <text class="desc-line">prep. 介词</text>
+          <text class="desc-line">conj. 连词</text>
+          <text class="desc-line">interj. 感叹词</text>
+          <text class="desc-line">num.  数词</text>
         </div>
       </list-item>
     </list>
@@ -93,8 +116,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 20
-    const endsAtRightQuarter = endX >= 180
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.1
+    const endsAtRightQuarter = endX >= sw * 0.85
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 60
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -120,11 +144,27 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 8px;
   background-color: #000000;
   flex-direction: column;
   align-items: center;
+}
+
+@media (shape: circle) {
+  .page {
+    justify-content: center;
+  }
+  .back-pill {
+    width: 70px;
+    height: 64px;
+  }
+}
+
+@media (shape: rect) {
+  .page {
+    justify-content: center;
+  }
 }
 
 .back-pill {
@@ -167,12 +207,13 @@ export default {
 
 .app-card {
   width: 188px;
-  height: 186px;
+  height: 240px;
   padding-left: 18px;
   padding-top: 24px;
   border-radius: 30px;
   background-color: #242424;
   flex-direction: column;
+  position: relative;
 }
 
 .app-name {
@@ -192,62 +233,12 @@ export default {
   text-align: left;
 }
 
-.mini-icon {
-  width: 58px;
-  height: 42px;
-  margin-left: 104px;
-  margin-top: 30px;
-  flex-direction: row;
-}
-
-.mini-left {
-  width: 29px;
-  height: 42px;
-  padding-top: 11px;
-  padding-left: 7px;
-  border-width: 3px;
-  border-color: #ffffff;
-  border-radius: 6px;
-  background-color: #0a1f3c;
-  flex-direction: column;
-}
-
-.mini-right {
-  width: 29px;
-  height: 42px;
-  padding-top: 11px;
-  padding-left: 7px;
-  border-width: 3px;
-  border-color: #ffffff;
-  border-radius: 6px;
-  background-color: #0e2a50;
-  flex-direction: column;
-}
-
-.mini-line {
-  width: 12px;
-  height: 3px;
-  margin-bottom: 5px;
-  border-radius: 2px;
-  background-color: #76b7ff;
-}
-
-.short {
-  width: 8px;
-}
-
-.right-line {
-  width: 10px;
-}
-
-.mini-mark {
-  width: 8px;
-  height: 14px;
-  margin-left: 9px;
-  margin-top: -10px;
-  margin-bottom: -1px;
-  border-radius: 3px;
-  background-color: #2f8cff;
+.deco-icon-about {
+  width: 116px;
+  height: 116px;
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
 }
 
 .section-title {
