@@ -998,23 +998,6 @@ export default {
   align-items: center;
 }
 
-@media (shape: circle) {
-  .page {
-    padding-top: 12px;
-    justify-content: center;
-  }
-  .back-button {
-    width: 70px;
-    height: 48px;
-  }
-}
-
-@media (shape: rect) {
-  .page {
-    justify-content: center;
-  }
-}
-
 .back-button {
   width: 78px;
   height: 54px;

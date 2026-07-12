@@ -81,7 +81,7 @@ export default {
   },
 
   onInit() {
-    this.screenType = this.$app.$def.data.screenShape || "pill-shaped"
+    this.screenType = (this.$app?.$def?.data?.screenShape) || "pill-shaped"
     if (this.queryParam) {
       this.query = this.queryParam
       this.cursorIndex = this.query.length
@@ -89,7 +89,9 @@ export default {
     this.keyboardHidden = this.autoSearch === "1" ? true : false
     this.refreshDisplay()
     if (this.autoSearch === "1" && this.query) {
-      this.performSearch()
+      setTimeout(() => {
+        this.performSearch()
+      }, 200)
     }
   },
 

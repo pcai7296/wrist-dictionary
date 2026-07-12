@@ -96,23 +96,4 @@ export default {
   margin-top: 68px;
 }
 
-@media (shape: circle) {
-  .page {
-    justify-content: center;
-  }
-  .sponsor-code {
-    width: 160px;
-    height: 160px;
-    margin-top: 24px;
-  }
-}
-
-@media (shape: rect) {
-  .page {
-    justify-content: center;
-  }
-  .sponsor-code {
-    margin-top: 24px;
-  }
-}
 </style>

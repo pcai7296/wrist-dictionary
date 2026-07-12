@@ -837,11 +837,4 @@ export default {
   width:unset;
 }
 
-@media (min-width: 230) and (max-width: 235) and (shape: circle) {
-  #full-keyboard {
-    transform:scale(0.96);
-    transform-origin:0 321px;
-    overflow:visible;
-  }
-}
 </style>

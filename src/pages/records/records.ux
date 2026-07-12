@@ -220,31 +220,6 @@ export default {
   align-items: center;
 }
 
-@media (shape: circle) {
-  .page {
-    justify-content: center;
-  }
-  .back-pill {
-    width: 70px;
-    height: 64px;
-  }
-  .record-list {
-    width: 172px;
-  }
-  .record-item {
-    width: 172px;
-  }
-  .record-card {
-    width: 172px;
-  }
-}
-
-@media (shape: rect) {
-  .page {
-    justify-content: center;
-  }
-}
-
 .back-pill {
   width: 78px;
   height: 72px;
