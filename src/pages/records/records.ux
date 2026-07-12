@@ -74,11 +74,10 @@ export default {
       return
     }
     if (this.type === "history") {
-      router.replace({
+      router.push({
         uri: "/pages/search",
         params: {
-          queryParam: item.query || "",
-          autoSearch: "1"
+          queryParam: item.query || ""
         }
       })
       return
