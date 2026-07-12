@@ -78,7 +78,7 @@ export default {
     toastCooldown: 1500,
     touchStartX: -1,
     touchStartY: -1,
-    _destroyed: false
+    destroyed: false
   },
 
   onInit() {
@@ -97,7 +97,7 @@ export default {
   },
 
   onDestroy() {
-    this._destroyed = true
+    this.destroyed = true
   },
 
   toggleKeyboard() {

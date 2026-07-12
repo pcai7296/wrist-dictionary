@@ -34,7 +34,7 @@ export default {
     emptyText: "",
     touchStartX: -1,
     touchStartY: -1,
-    _destroyed: false
+    destroyed: false
   },
 
   onInit() {
@@ -42,7 +42,7 @@ export default {
   },
 
   onDestroy() {
-    this._destroyed = true
+    this.destroyed = true
   },
 
   onShow() {
@@ -59,11 +59,11 @@ export default {
     storage.get({
       key: key,
       success: (data) => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         this.records = this.buildRecords(this.parseList(data))
       },
       fail: () => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         this.records = []
       }
     })
@@ -75,9 +75,11 @@ export default {
     }
     if (this.type === "history") {
       router.push({
-        uri: "/pages/search",
+        uri: "/pages/results",
         params: {
-          queryParam: item.query || ""
+          query: item.query || "",
+          searchMode: "",
+          inflectDepth: "0"
         }
       })
       return

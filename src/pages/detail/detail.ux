@@ -53,7 +53,7 @@ export default {
     maxInflectDepth: 3,
     touchStartX: -1,
     touchStartY: -1,
-    _destroyed: false
+    destroyed: false
   },
 
   onInit() {
@@ -70,7 +70,7 @@ export default {
   },
 
   onDestroy() {
-    this._destroyed = true
+    this.destroyed = true
   },
 
   goBack() {
@@ -190,7 +190,7 @@ export default {
     storage.get({
       key: "dic_favorites",
       success: (data) => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         const list = this.parseList(data)
         const word = this.normalizeWord(this.wordText)
         this.favoriteLabel = "收藏"
@@ -202,7 +202,7 @@ export default {
         }
       },
       fail: () => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         this.favoriteLabel = "收藏"
       }
     })
@@ -345,13 +345,13 @@ export default {
       uri: uri,
       encoding: "utf-8",
       success: (data) => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         const text = data && data.text ? data.text : ""
         this.fileCache[uri] = text
         done(text)
       },
       fail: () => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         this.fileCache[uri] = ""
         done("")
       }

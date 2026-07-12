@@ -90,7 +90,7 @@ export default {
     toastCooldown: 1500,
     touchStartX: -1,
     touchStartY: -1,
-    _destroyed: false
+    destroyed: false
   },
 
   onInit() {
@@ -835,13 +835,13 @@ export default {
       uri: uri,
       encoding: "utf-8",
       success: (data) => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         const text = data && data.text ? data.text : ""
         this.fileCache.set(uri, text)
         done(text)
       },
       fail: () => {
-        if (this._destroyed) return
+        if (this.destroyed) return
         this.fileCache.set(uri, "")
         done("")
       }
@@ -869,7 +869,7 @@ export default {
   },
 
   onDestroy() {
-    this._destroyed = true
+    this.destroyed = true
     this.fileCache = null
     this.entryCache = null
     this.cnIndexCache = null
