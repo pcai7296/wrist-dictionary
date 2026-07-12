@@ -1,0 +1,3 @@
+exports.cli = {
+  enableJsc: true
+}

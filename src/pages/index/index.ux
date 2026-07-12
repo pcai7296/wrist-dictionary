@@ -6,21 +6,23 @@
       <img class="deco-icon" src="/common/deco-icon.png" />
     </div>
 
-    <div class="main-button secondary-button" @click="goInflectSearch">
-      <img class="btn-icon" src="/common/icons/btn_transform.png" />
-      <text class="btn-label">查找变形</text>
-    </div>
-    <div class="main-button secondary-button" @click="goSearch">
-      <img class="btn-icon" src="/common/icons/btn_search.png" />
-      <text class="btn-label">中英查找</text>
-    </div>
-    <div class="main-button secondary-button" @click="goHistory">
-      <img class="btn-icon" src="/common/icons/btn_history.png" />
-      <text class="btn-label">历史记录</text>
-    </div>
-    <div class="main-button secondary-button" @click="goFavorites">
-      <img class="btn-icon" src="/common/icons/btn_fav.png" />
-      <text class="btn-label">我的收藏</text>
+    <div class="button-group">
+      <div class="main-button secondary-button" @click="goInflectSearch">
+        <img class="btn-icon" src="/common/icons/btn_transform.png" />
+        <text class="btn-label">查找变形</text>
+      </div>
+      <div class="main-button secondary-button" @click="goSearch">
+        <img class="btn-icon" src="/common/icons/btn_search.png" />
+        <text class="btn-label">中英查找</text>
+      </div>
+      <div class="main-button secondary-button" @click="goHistory">
+        <img class="btn-icon" src="/common/icons/btn_history.png" />
+        <text class="btn-label">历史记录</text>
+      </div>
+      <div class="main-button secondary-button" @click="goFavorites">
+        <img class="btn-icon" src="/common/icons/btn_fav.png" />
+        <text class="btn-label">我的收藏</text>
+      </div>
     </div>
 
     <div class="bottom-row">
@@ -108,21 +110,16 @@ export default {
 }
 
 .icon-card {
-  width: 98px;
-  height: 88px;
-  margin-top: 12px;
-  margin-bottom: 19px;
-  border-radius: 25px;
-  border-width: 2px;
-  border-color: #1d74e8;
-  background-color: #07101d;
-  justify-content: center;
-  align-items: center;
+  display: none;
 }
 
 .deco-icon {
-  width: 84px;
-  height: 84px;
+  display: none;
+}
+
+.button-group {
+  flex-direction: column;
+  align-items: center;
 }
 
 .main-button {
@@ -179,8 +176,30 @@ export default {
 
 .btn-label-sm {
   color: #ffffff;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
+}
+
+/* 手环（pill-shaped）— 显示图标卡片 */
+@media screen and (shape: pill-shaped) {
+  .icon-card {
+    display: flex;
+    width: 98px;
+    height: 88px;
+    margin-top: 12px;
+    margin-bottom: 19px;
+    border-radius: 25px;
+    border-width: 2px;
+    border-color: #1d74e8;
+    background-color: #07101d;
+    justify-content: center;
+    align-items: center;
+  }
+  .deco-icon {
+    display: flex;
+    width: 84px;
+    height: 84px;
+  }
 }
 
 .about-button {
