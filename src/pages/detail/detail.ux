@@ -147,12 +147,10 @@ export default {
     storage.get({
       key: "dic_favorites",
       success: (data) => {
-        if (this._destroyed) return
         const list = this.parseList(data)
         this.writeFavoriteList(list, item)
       },
       fail: () => {
-        if (this._destroyed) return
         this.writeFavoriteList([], item)
       }
     })

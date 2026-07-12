@@ -226,12 +226,10 @@ export default {
     storage.get({
       key: "dic_history",
       success: (data) => {
-        if (this._destroyed) return
         const list = this.parseList(data)
         this.writeHistoryList(list, item)
       },
       fail: () => {
-        if (this._destroyed) return
         this.writeHistoryList([], item)
       }
     })
