@@ -219,8 +219,8 @@
       <!-- 胶囊屏66 -->
       <div if="{{screentype==='pill-shaped'}}" style="width: 100%;height: 305px">
         <div static style="position:absolute;left:0px;top:34px;width:100%;height:276px;">
-          <progress percent="{{30+percent66}}" type="arc" style="start-angle:204deg;total-angle:-48deg;width:188px;height:188px;top:82px;left:2px;position:absolute;color:#ffffff;stroke-width:6px;layer-color:#262626;margin-left: {{(screenWidth - 192)/2}}px;"></progress>
-          <scroll id="keyboard66" scroll-x="{{true}}" onscroll="handelScroll" style="padding-left: {{(screenWidth - 192)/2}}px;padding-right: {{(screenWidth - 192)/2}}px;">
+          <progress percent="{{30+percent66}}" type="arc" style="start-angle:204deg;total-angle:-48deg;width:188px;height:188px;top:82px;left:2px;position:absolute;color:#ffffff;stroke-width:6px;layer-color:#262626;margin-left: {{keyboardLeftOffset}}px;"></progress>
+          <scroll id="keyboard66" scroll-x="{{true}}" onscroll="handelScroll" style="padding-left: {{keyboardLeftOffset}}px;padding-right: {{keyboardLeftOffset}}px;">
             <div if="{{!numFlag}}" style="left: 3px; flex-direction: column;">
               <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
                 <text class="calbtn66" for="{{item in keys['full'][0]}}" @click="onSelect(item)">{{item}}</text>
@@ -257,7 +257,7 @@
             </div>
           </scroll>
         </div>
-        <div static style="position: absolute;left: {{(screenWidth - 192)/2}}px;top: 0px;width: 192px;height: 110px;"> 
+        <div static style="position: absolute;left: {{keyboardLeftOffset}}px;top: 0px;width: 192px;height: 110px;"> 
           <img static style="position: absolute;left: 3px;top: 47px;width: 186px;height: 60px;" src="./assets/arc/search.png" />
           <scroll id="cvalWaiting" scroll-x="{{true}}" style="position: absolute;left: 15px;top: 56px;width: 144px;height: 42px;">
             <div style="position: absolute;left: 0px;top: 0px;height: 42px;padding-right:20px">
@@ -272,7 +272,7 @@
         </div>
         <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
         <div style="position: absolute;top: 47px;width: 100%;height: 263px;background-color: black;" if="{{downFlag==='down'}}">
-          <div style="position: absolute;left: {{(screenWidth - 192)/2}}px;width: 192px;height: 263px;"> 
+          <div style="position: absolute;left: {{keyboardLeftOffset}}px;width: 192px;height: 263px;"> 
             <list static class="list66">
               <list-item type="waitingRows66" class="item66" for="{{itemArray in resultList2}}">
                 <div class="item column center" for="{{item in itemArray}}">
@@ -381,7 +381,8 @@ export default {
     percent66: 0,
     // 针对screenShape为rect的设备，会自动获取screenWidth并绑定到根div
     // 这样便能同时适配n67和o65甚至是后续设备，但实际效果可能受designWidth影响
-    screenWidth: 336,
+    screenWidth: 212,
+    keyboardLeftOffset: 10, // (212 - 192) / 2, 由 adjustScreenWidth 更新
     keys: KEY_MAPS,
   },
   onInit() {
@@ -674,6 +675,12 @@ export default {
     device.getInfo({
       success: (data) => {
         this.screenWidth = data.screenWidth;
+        this.keyboardLeftOffset = Math.max(0, (data.screenWidth - 192) / 2);
+        this.$emit("ready", {});
+      },
+      fail: () => {
+        this.keyboardLeftOffset = Math.max(0, (this.screenWidth - 192) / 2);
+        this.$emit("ready", {});
       }
     })
   }

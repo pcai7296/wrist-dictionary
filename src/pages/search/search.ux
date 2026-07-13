@@ -26,6 +26,7 @@
       @key-down="onKeyDown"
       @delete="onDelete"
       @complete="onComplete"
+      @ready="onReady"
     ></input-method>
   </div>
 </template>
@@ -78,7 +79,8 @@ export default {
     toastCooldown: 1500,
     touchStartX: -1,
     touchStartY: -1,
-    destroyed: false
+    destroyed: false,
+    autoSearchPending: false
   },
 
   onInit() {
@@ -90,14 +92,27 @@ export default {
     this.keyboardHidden = this.autoSearch === "1" ? true : false
     this.refreshDisplay()
     if (this.autoSearch === "1" && this.query) {
+      this.autoSearchPending = true
+      // 等待 InputMethod 异步初始化完成（ready 事件）后再跳转
+      // timeout 兜底，防止 ready 事件过早/过晚触发
       setTimeout(() => {
-        this.performSearch()
-      }, 200)
+        if (this.autoSearchPending) {
+          this.autoSearchPending = false
+          this.performSearch()
+        }
+      }, 500)
     }
   },
 
   onDestroy() {
     this.destroyed = true
+  },
+
+  onReady() {
+    if (this.autoSearchPending) {
+      this.autoSearchPending = false
+      this.performSearch()
+    }
   },
 
   toggleKeyboard() {
