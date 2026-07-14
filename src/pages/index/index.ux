@@ -1,36 +1,39 @@
 <template>
-  <div class="page">
-    <text class="title">腕上词典</text>
+  <div class="page page-{{screenProfile}}">
+    <text class="title title-{{screenProfile}}">腕上词典</text>
 
-    <div class="icon-card">
-      <img class="deco-icon" src="/common/deco-icon.png" />
+    <div class="icon-card icon-card-{{screenProfile}}">
+      <img class="deco-icon deco-icon-{{screenProfile}}" src="/common/deco-icon.png" />
     </div>
 
-    <div class="button-group">
-      <div class="main-button secondary-button" @click="goInflectSearch">
-        <img class="btn-icon" src="/common/icons/btn_transform.png" />
+    <div class="button-group button-group-{{screenProfile}}">
+      <div
+        class="main-button main-button-{{screenProfile}} secondary-button"
+        @click="goInflectSearch"
+      >
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_transform.png" />
         <text class="btn-label">查找变形</text>
       </div>
-      <div class="main-button secondary-button" @click="goSearch">
-        <img class="btn-icon" src="/common/icons/btn_search.png" />
+      <div class="main-button main-button-{{screenProfile}} secondary-button" @click="goSearch">
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_search.png" />
         <text class="btn-label">中英查找</text>
       </div>
-      <div class="main-button secondary-button" @click="goHistory">
-        <img class="btn-icon" src="/common/icons/btn_history.png" />
+      <div class="main-button main-button-{{screenProfile}} secondary-button" @click="goHistory">
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_history.png" />
         <text class="btn-label">历史记录</text>
       </div>
-      <div class="main-button secondary-button" @click="goFavorites">
-        <img class="btn-icon" src="/common/icons/btn_fav.png" />
+      <div class="main-button main-button-{{screenProfile}} secondary-button" @click="goFavorites">
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_fav.png" />
         <text class="btn-label">我的收藏</text>
       </div>
     </div>
 
-    <div class="bottom-row">
-      <div class="small-button about-button" @click="goAbout">
+    <div class="bottom-row bottom-row-{{screenProfile}}">
+      <div class="small-button small-button-{{screenProfile}} about-button" @click="goAbout">
         <img class="btn-icon-sm" src="/common/icons/btn_about.png" />
         <text class="btn-label-sm">关于</text>
       </div>
-      <div class="small-button sponsor-button" @click="goSponsor">
+      <div class="small-button small-button-{{screenProfile}} sponsor-button" @click="goSponsor">
         <img class="btn-icon-sm" src="/common/icons/btn_sponsor.png" />
         <text class="btn-label-sm">赞助</text>
       </div>
@@ -39,9 +42,28 @@
 </template>
 
 <script>
+import device from "@system.device"
 import router from "@system.router"
 
 export default {
+  private: {
+    screenProfile: "pill-standard"
+  },
+
+  onInit() {
+    const app = this.$app.$def
+    this.screenProfile = app.data.screenProfile || "pill-standard"
+    device.getInfo({
+      success: (data) => {
+        app.updateScreenInfo(data)
+        this.screenProfile = app.data.screenProfile
+      },
+      fail: (data, code) => {
+        console.log("index device.getInfo failed: " + code)
+      }
+    })
+  },
+
   goInflectSearch() {
     router.push({
       uri: "/pages/search",
@@ -180,26 +202,113 @@ export default {
   font-weight: 800;
 }
 
-/* 手环（pill-shaped）— 显示图标卡片 */
-@media screen and (shape: pill-shaped) {
-  .icon-card {
-    display: flex;
-    width: 98px;
-    height: 88px;
-    margin-top: 12px;
-    margin-bottom: 19px;
-    border-radius: 25px;
-    border-width: 2px;
-    border-color: #1d74e8;
-    background-color: #07101d;
-    justify-content: center;
-    align-items: center;
-  }
-  .deco-icon {
-    display: flex;
-    width: 84px;
-    height: 84px;
-  }
+/* 启动时由 device.getInfo 选择档案，避免已知不兼容的 shape 媒体查询。 */
+.icon-card-pill-standard {
+  display: flex;
+  width: 98px;
+  height: 88px;
+  margin-top: 12px;
+  margin-bottom: 19px;
+  border-radius: 25px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-pill-standard {
+  display: flex;
+  width: 84px;
+  height: 84px;
+}
+
+.page-pill-compact {
+  padding-top: 30px;
+}
+
+.title-pill-compact {
+  height: 38px;
+  font-size: 28px;
+}
+
+.icon-card-pill-compact {
+  display: flex;
+  width: 76px;
+  height: 68px;
+  margin-top: 6px;
+  margin-bottom: 12px;
+  border-radius: 22px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-pill-compact {
+  display: flex;
+  width: 64px;
+  height: 64px;
+}
+
+.main-button-pill-compact {
+  height: 46px;
+  margin-bottom: 9px;
+}
+
+.bottom-row-pill-compact {
+  height: 40px;
+  margin-top: -1px;
+}
+
+.small-button-pill-compact {
+  height: 40px;
+}
+
+.title-rect,
+.title-circle {
+  margin-bottom: 20px;
+}
+
+.page-circle {
+  padding-top: 46px;
+}
+
+.button-group-rect {
+  width: 84%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.button-group-circle {
+  width: 76%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.main-button-rect,
+.main-button-circle {
+  width: 47%;
+  height: 72px;
+  margin-bottom: 12px;
+}
+
+.btn-icon-rect,
+.btn-icon-circle {
+  width: 22px;
+  height: 22px;
+  margin-left: 8px;
+  margin-right: 4px;
+}
+
+.bottom-row-rect,
+.bottom-row-circle {
+  margin-top: 8px;
 }
 
 .about-button {
