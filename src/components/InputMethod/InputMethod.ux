@@ -13,11 +13,26 @@
           <div style="position: absolute;top:-4px;left:78px;width:324px;" show="{{downFlag==='' && !numFlag && cval}}">
             <text class="caltext" style="width:296px;"> {{cval}}_ </text>
           </div>
-          <div style="position: absolute;top:38px;left:80px;width:277px" show="{{(lang === 'cn' || lang === 'en') && !numFlag}}">
+          <div style="position: absolute;top:38px;left:80px;width:277px" show="{{lang === 'cn' && !numFlag}}">
             <div class="item column center" for="{{cvalList}}">
               <input show='{{resultList.length > $idx}}' class="calbtn0" type="button" value="{{resultList[$idx]}}" @click="onRsSelect(resultList[$idx])" />
             </div>
           </div>
+          <scroll
+            id="circleEnglishCandidates"
+            scroll-x="{{true}}"
+            style="position: absolute;top:38px;left:80px;width:277px;height:52px;"
+            show="{{lang === 'en' && !numFlag}}"
+          >
+            <div static style="height:52px;flex-direction:row;align-items:center;">
+              <text
+                for="{{cvalList}}"
+                show="{{resultList.length > $idx}}"
+                class="circle-en-candidate"
+                @click="onRsSelect(resultList[$idx])"
+              >{{resultList[$idx]}}</text>
+            </div>
+          </scroll>
           <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
           <list class="list3" if="{{downFlag==='down'}}">
             <list-item type="waitingRows62t9" class="item3" for="{{itemArray in resultList2}}">
@@ -714,6 +729,15 @@ export default {
 	font-size:32px;
 	text-align:center;
 	height:42px;
+}
+.circle-en-candidate {
+	color:rgb(255,255,255);
+	font-size:28px;
+	text-align:center;
+	height:42px;
+	lines:1;
+	text-overflow:ellipsis;
+	padding-right:10px;
 }
 .calbtnfull {
 	color:#fff;

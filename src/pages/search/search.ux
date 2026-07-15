@@ -1,17 +1,17 @@
 <import name="input-method" src="../../components/InputMethod/InputMethod.ux"></import>
 
 <template>
-  <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+  <div class="page page-{{screenProfile}}" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
     <div class="search-button" @click="onSearchButtonClick">
       <img class="search-icon" if="{{ query }}" src="/common/search-icon.png" />
       <text class="back-text" if="{{ !query }}">返回</text>
     </div>
 
-    <div class="input-box" @click="toggleKeyboard">
-      <text class="input-text">{{ displayText }}</text>
+    <div class="input-box input-box-{{screenProfile}}" @click="toggleKeyboard">
+      <text class="input-text input-text-{{screenProfile}}">{{ displayText }}</text>
     </div>
 
-    <div class="edit-row">
+    <div class="edit-row edit-row-{{screenProfile}}">
       <input class="edit-button side-button" type="button" value="左" @click="moveLeft" />
       <input class="edit-button clear-button" type="button" value="清空" @click="clearText" />
       <input class="edit-button side-button" type="button" value="右" @click="moveRight" />
@@ -20,7 +20,7 @@
     <input-method
       hide="{{ keyboardHidden }}"
       keyboardtype="{{ keyboardType }}"
-      maxlength="5"
+      maxlength="{{ maxLength }}"
       vibratemode="{{ vibrateMode }}"
       screentype="{{ screenType }}"
       @visibility-change="onVisibilityChange"
@@ -33,6 +33,7 @@
 </template>
 
 <script>
+import device from "@system.device"
 import router from "@system.router"
 import storage from "@system.storage"
 import prompt from "@system.prompt"
@@ -63,7 +64,8 @@ export default {
     queryParam: "",
     autoSearch: "",
     searchMode: "",
-    inflectDepth: ""
+    inflectDepth: "",
+    screenProfile: "pill-standard"
   },
 
   private: {
@@ -75,6 +77,7 @@ export default {
     keyboardHidden: false,
     keyboardType: "QWERTY",
     screenType: "pill-shaped",
+    maxLength: 5,
     vibrateMode: "short",
     lastToastAt: 0,
     toastCooldown: 1500,
@@ -90,9 +93,23 @@ export default {
   onInit() {
     this.englishSuggestionCache = {}
     this.englishSuggestionPending = {}
-    this.screenType = this.$app?.$def?.data?.screenShape || "pill-shaped"
+    const app = this.$app.$def
+    this.applyScreenInfo(app.data)
+    device.getInfo({
+      success: (data) => {
+        app.updateScreenInfo(data)
+        this.applyScreenInfo(app.data)
+        this.maxLength = this.getMaxLength(
+          data.screenShape || app.data.screenShape,
+          Number(data.screenWidth || app.data.screenWidth || 212)
+        )
+      },
+      fail: (data, code) => {
+        console.log("search device.getInfo failed: " + code)
+      }
+    })
     if (this.queryParam) {
-      this.query = this.queryParam
+      this.query = this.queryParam.slice(0, this.maxLength)
       this.cursorIndex = this.query.length
     }
     this.keyboardHidden = this.autoSearch === "1" ? true : false
@@ -108,6 +125,28 @@ export default {
         }
       }, 500)
     }
+  },
+
+  applyScreenInfo(data) {
+    const screenShape = data.screenShape || "pill-shaped"
+    const screenWidth = Number(data.screenWidth || 212)
+    this.screenType = screenShape
+    this.screenProfile = data.screenProfile || "pill-standard"
+    this.maxLength = this.getMaxLength(screenShape, screenWidth)
+    if (this.query.length > this.maxLength) {
+      this.query = this.query.slice(0, this.maxLength)
+      this.cursorIndex = Math.min(this.cursorIndex, this.maxLength)
+    }
+  },
+
+  getMaxLength(screenShape, screenWidth) {
+    if (screenShape === "circle") {
+      return 15
+    }
+    if (screenShape === "rect") {
+      return screenWidth >= 400 ? 15 : 11
+    }
+    return 5
   },
 
   onDestroy() {
@@ -148,9 +187,15 @@ export default {
   onComplete(evt) {
     if (evt && evt.detail && evt.detail.content) {
       const content = evt.detail.content
+      const remaining = this.maxLength - this.query.length
+      if (remaining <= 0) {
+        this.refreshDisplay()
+        return
+      }
+      const acceptedContent = content.slice(0, remaining)
       this.query =
-        this.query.slice(0, this.cursorIndex) + content + this.query.slice(this.cursorIndex)
-      this.cursorIndex += content.length
+        this.query.slice(0, this.cursorIndex) + acceptedContent + this.query.slice(this.cursorIndex)
+      this.cursorIndex += acceptedContent.length
     }
     this.refreshDisplay()
   },
@@ -336,6 +381,10 @@ export default {
   },
 
   refreshDisplay() {
+    if (this.query.length > this.maxLength) {
+      this.query = this.query.slice(0, this.maxLength)
+      this.cursorIndex = Math.min(this.cursorIndex, this.maxLength)
+    }
     if (!this.query) {
       this.cursorIndex = 0
       this.displayText = ""
@@ -589,16 +638,18 @@ export default {
   border-color: #2f8cff;
   border-radius: 18px;
   background-color: #08172b;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 4px;
 }
 
 .input-text {
-  width: 140px;
+  width: 100%;
   height: 36px;
   color: #ffffff;
   font-size: 26px;
   font-weight: 700;
-  text-align: center;
+  text-align: left;
 }
 
 .edit-row {
@@ -626,5 +677,27 @@ export default {
 .clear-button {
   width: 62px;
   background-color: #d82626;
+}
+
+.input-box-rect {
+  width: 72%;
+}
+
+.input-text-rect {
+  font-size: 22px;
+}
+
+.input-box-circle {
+  width: 62%;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.input-text-circle {
+  font-size: 22px;
+}
+
+.page-circle {
+  padding-top: 16px;
 }
 </style>
