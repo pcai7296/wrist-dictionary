@@ -8,7 +8,11 @@
     </div>
 
     <div class="input-box input-box-{{screenProfile}}" @click="toggleKeyboard">
-      <text class="input-text input-text-{{screenProfile}}">{{ displayText }}</text>
+      <!-- 常驻 marquee，短时静态、超长时从右向左平滑滚动 -->
+      <marquee id="marquee-text" class="input-text input-text-{{screenProfile}}"
+        scrollamount="{{marqueeSpeed}}" direction="left" loop="-1" text-offset="40">
+        {{ displayText }}
+      </marquee>
     </div>
 
     <div class="edit-row edit-row-{{screenProfile}}">
@@ -87,7 +91,9 @@ export default {
     autoSearchPending: false,
     englishSuggestionCache: null,
     englishSuggestionPending: null,
-    englishSuggestionToken: 0
+    englishSuggestionToken: 0,
+    marqueeActive: false,
+    marqueeSpeed: 40
   },
 
   onInit() {
@@ -103,13 +109,14 @@ export default {
           data.screenShape || app.data.screenShape,
           Number(data.screenWidth || app.data.screenWidth || 212)
         )
+        this.refreshDisplay()
       },
       fail: (data, code) => {
         console.log("search device.getInfo failed: " + code)
       }
     })
     if (this.queryParam) {
-      this.query = this.queryParam.slice(0, this.maxLength)
+      this.query = this.queryParam
       this.cursorIndex = this.query.length
     }
     this.keyboardHidden = this.autoSearch === "1" ? true : false
@@ -133,10 +140,6 @@ export default {
     this.screenType = screenShape
     this.screenProfile = data.screenProfile || "pill-standard"
     this.maxLength = this.getMaxLength(screenShape, screenWidth)
-    if (this.query.length > this.maxLength) {
-      this.query = this.query.slice(0, this.maxLength)
-      this.cursorIndex = Math.min(this.cursorIndex, this.maxLength)
-    }
   },
 
   getMaxLength(screenShape, screenWidth) {
@@ -151,6 +154,7 @@ export default {
 
   onDestroy() {
     this.destroyed = true
+    this.stopMarquee()
   },
 
   onReady() {
@@ -187,15 +191,9 @@ export default {
   onComplete(evt) {
     if (evt && evt.detail && evt.detail.content) {
       const content = evt.detail.content
-      const remaining = this.maxLength - this.query.length
-      if (remaining <= 0) {
-        this.refreshDisplay()
-        return
-      }
-      const acceptedContent = content.slice(0, remaining)
       this.query =
-        this.query.slice(0, this.cursorIndex) + acceptedContent + this.query.slice(this.cursorIndex)
-      this.cursorIndex += acceptedContent.length
+        this.query.slice(0, this.cursorIndex) + content + this.query.slice(this.cursorIndex)
+      this.cursorIndex += content.length
     }
     this.refreshDisplay()
   },
@@ -381,11 +379,8 @@ export default {
   },
 
   refreshDisplay() {
-    if (this.query.length > this.maxLength) {
-      this.query = this.query.slice(0, this.maxLength)
-      this.cursorIndex = Math.min(this.cursorIndex, this.maxLength)
-    }
     if (!this.query) {
+      this.stopMarquee()
       this.cursorIndex = 0
       this.displayText = ""
       this.englishSeed = ""
@@ -403,11 +398,40 @@ export default {
       this.cursorIndex = this.query.length
     }
 
-    this.displayText =
-      this.query.slice(0, this.cursorIndex) +
-      (this.keyboardHidden ? "" : "_") +
-      this.query.slice(this.cursorIndex)
+    if (this.query.length > this.maxLength && this.keyboardHidden) {
+      this.startMarquee()
+    } else {
+      this.stopMarquee()
+      this.displayText =
+        this.query.slice(0, this.cursorIndex) +
+        (this.keyboardHidden ? "" : "_") +
+        this.query.slice(this.cursorIndex)
+    }
     this.updateEnglishSeed()
+  },
+
+  startMarquee() {
+    this.marqueeSpeed = this.calcMarqueeSpeed(this.query.length)
+    this.displayText = this.query + "   " + this.query
+    setTimeout(() => {
+      const el = this.$element("marquee-text")
+      if (el && el.start) {
+        el.start()
+      }
+    }, 50)
+  },
+
+  stopMarquee() {
+    const el = this.$element("marquee-text")
+    if (el && el.stop) {
+      el.stop()
+    }
+  },
+
+  calcMarqueeSpeed(textLength) {
+    const extra = Math.max(0, textLength - this.maxLength)
+    // 字符越长滚动越快，范围 40~60 px/tick
+    return Math.max(40, Math.min(60, Math.round(40 + extra * 1.5)))
   },
 
   updateEnglishSeed() {
@@ -700,4 +724,6 @@ export default {
 .page-circle {
   padding-top: 16px;
 }
+
+
 </style>
