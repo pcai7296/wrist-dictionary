@@ -104,8 +104,7 @@ src/
 ├── components/
 │   └── InputMethod/              # 英文输入法（全键盘 + 光标控制）
 ├── common/
-│   ├── dict/                     # 词典分片（自动生成，请勿手动编辑）
-│   ├── english_suggestions.js    # 按字母分桶的英语补全列表
+│   ├── dict/                     # 紧凑词典分片（自动生成，请勿手动编辑）
 │   └── logo.png                  # 应用图标
 ├── i18n/                         # 国际化文件（zh-CN, en, defaults）
 scripts/
@@ -121,13 +120,16 @@ scripts/
 
 | 组件 | 说明 |
 |------|------|
-| **英文索引** | 按 2 字符前缀分片；单字母查询走 `index_en.txt` 映射 |
-| **中文索引** | 按 Unicode `codepoint % 64` 分 64 个桶 |
-| **变形索引** | 屈折形式→词头的反向分片索引 |
-| **词条存储** | 按 `entryId / 500` 分片，中文查词路径使用 |
-| **模糊搜索** | 编辑距离受限扫描（≤2），最多扫 4000 词，候选池 80 条 |
+| **英文索引** | 26 个 `words/word_<a-z>.txt`；每行 `word<TAB>entryId<TAB>tag` |
+| **中文索引** | 按 Unicode `codepoint % 64` 分 64 桶；ID 列表用递增差值 + base36 严格解码 |
+| **变形索引** | `key_for()` 的 2 字符分片仅用于 `inflect/` 与 `inflect_reverse/` |
+| **词条存储** | `entries/entry_<nn>.txt` 按 `entryId / 500` 分片，是英/中文结果补全的唯一完整词条数据 |
+| **自动补全** | 异步读取并缓存同一份紧凑英文索引；考试标签参与排序 |
+| **模糊搜索** | 扫描紧凑英文索引（≤4000 词、候选池 80），再按 `entryId` 补全完整词条 |
 
 > **14,942 条词汇**，源自 ECDICT + BNC/COCA 词族频率数据。
+
+不再打包 `index_en.txt` 或 `english_suggestions.js/.json`。2026-07-15 的实际构建测得：RPK 2.770 MiB，逻辑解包 5.561 MiB，其中词典 5.190 MiB；详见 `.omo/start-work/artifacts/dictionary-size-compaction/integration.txt`。
 
 ### 重新生成词典
 
@@ -135,7 +137,7 @@ scripts/
 python scripts/generate_watch_dict.py
 ```
 
-数据来源：`data/ecdict_tagged_14942_compact.csv` + 可选 `data/bnc_coca_word_family_lists_v2.xlsx`。
+数据来源：`data/ecdict_tagged_14942_compact.csv` + `data/cedict.txt.gz` + 可选 `data/bnc_coca_word_family_lists_v2.xlsx`。
 
 ---
 

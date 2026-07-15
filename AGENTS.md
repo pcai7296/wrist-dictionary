@@ -75,7 +75,6 @@ src/
     InputMethod/                  — English QWERTY keyboard (852 lines), sub-assets for layouts
   common/
     dict/                         — Generated shards (gitignored, do NOT edit)
-    english_suggestions.js        — Letter-indexed word list by exam tag
     icons/                        — Button/decoration icons
     i18n/                         — Internationalization files
 scripts/                          — generate_watch_dict.py, deploy_watch.ps1
@@ -114,13 +113,15 @@ Regenerate: python scripts/generate_watch_dict.py (never edit shards directly).
 
 | Feature | Mechanism |
 |---------|-----------|
-| English lookup | 2-char prefix shard key (key_for()). index_en.txt maps first-letter to shard |
-| Chinese lookup | Unicode codepoint % 64 to 64 bucket files (zh_00.txt..zh_3f.txt) |
-| Inflect lookup | inflect/ shards + inflect_reverse/ reverse index |
-| Entry lookup | entryId / 500 sharding (Chinese path only) |
+| English lookup | 26 first-letter files (`words/word_a.txt`..`word_z.txt`); row = `word<TAB>entryId<TAB>tag` |
+| Chinese lookup | Unicode codepoint % 64 to 64 bucket files; ID lists are strictly decoded delta-base36 |
+| Inflect lookup | `inflect/` + `inflect_reverse/`; `key_for()` 2-char sharding is used only here |
+| Entry lookup | `entries/entry_<nn>.txt`, sharded by `entryId / 500`; canonical full data for English and Chinese hydration |
 | Fuzzy search | Edit distance <=2, scan <=4000 words, pool <=80 candidates |
-| Autocomplete | ENGLISH_SUGGESTION_BUCKETS in english_suggestions.js by exam tag |
+| Autocomplete | Async read/cache of the same compact `word_<a-z>.txt` index; exam tag affects ranking |
 | Results cap | 20 |
+
+There is no `index_en.txt` or `english_suggestions.js/.json` runtime resource.
 
 Coverage: English 100%, Chinese ~86% (14 modern words missing from CC-CEDICT).
 Test: python omo/dict_coverage_test.py
@@ -156,8 +157,8 @@ Copy pattern from any page except about. Needs getTouchPoint() + 	ouchStartX/Y.
 
 ## Tests & CI
 
-- **Tests**: None. No test framework.
-- **CI**: None. No GitHub Actions.
+- **Offline tests**: `omo/dict_coverage_test.py`, `omo/dict_compaction_test.py`, `omo/dict_semantic_validator.py`
+- **Test framework / CI**: No app test framework. No GitHub Actions.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -176,8 +177,9 @@ pm run lint.
 
 | Symbol | Type | File | Role |
 |--------|------|------|------|
-| key_for() | function | scripts/generate_watch_dict.py:29 | Generate 2-char shard key for word |
-| zh_bucket_for() | function | scripts/generate_watch_dict.py:48 | Unicode bucket for Chinese index |
-| load_cc_cedict() | function | scripts/generate_watch_dict.py:67 | Parse CC-CEDICT into cn_index |
+| key_for() | function | scripts/generate_watch_dict.py | Generate 2-char shard key for inflect / reverse-inflect files only |
+| zh_bucket_for() | function | scripts/generate_watch_dict.py | Unicode bucket for Chinese index |
+| load_cc_cedict() | function | scripts/generate_watch_dict.py | Parse CC-CEDICT into cn_index |
 | SimpleInputMethod | object | src/components/InputMethod/assets/dicUtil.js | English dict query orchestration |
-| ENGLISH_SUGGESTION_BUCKETS | object | src/common/english_suggestions.js:1 | Letter-indexed word lists with exam tags |
+| decodeDeltaIds() | function | src/pages/results/results.ux | Strictly decode delta-base36 Chinese index IDs |
+| loadEnglishSuggestionSource() | function | src/pages/search/search.ux | Async load/cache compact first-letter word index |

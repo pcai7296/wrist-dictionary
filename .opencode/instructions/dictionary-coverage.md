@@ -28,6 +28,15 @@ python scripts/generate_watch_dict.py
 npx aiot build
 ```
 
+### 当前紧凑存储契约
+
+- 英文索引固定为 26 个 `words/word_<a-z>.txt`，每行 `word<TAB>entryId<TAB>tag`
+- `entries/entry_<nn>.txt` 是完整词条的唯一权威数据，英文和中文结果都按 `entryId` 从这里补全
+- `cn_index/`、`zh_index/` 的 ID 列表使用“递增差值 + base36”，运行时必须严格解码；格式错误时整行拒绝
+- 自动补全异步读取并缓存同一份紧凑英文索引，不再维护独立建议词表
+- `key_for()` 的 2 字符分片只用于 `inflect/`、`inflect_reverse/`
+- 不存在 `index_en.txt`、`english_suggestions.js` 或 `english_suggestions.json` 运行时资源
+
 ### 效果
 
 | 指标 | 旧（仅 ECDICT） | 新（+CC-CEDICT） |
@@ -35,9 +44,11 @@ npx aiot build
 | cn_index 词组数 | 37,291 | 122,067 (+97,750) |
 | 中文命中率（V1 测试） | 64.0% | 100% |
 | 中文命中率（V2 新词测试） | — | **85.9%** |
-| RPK 大小 | 1.8 MB | 3.6 MB |
+| RPK 大小（当时、紧凑化前） | 1.8 MB | 3.6 MB |
 
 V1 测试用同一组 100 词前后对比，V2 用全新 100 词（与 V1 零重叠）验证，排除测试集偏差。
+
+2026-07-15 紧凑化后的实际构建：14,942 英文词条、122,067 中文词组保持不变；RPK 2.770 MiB，逻辑解包 5.561 MiB，词典逻辑体积 5.190 MiB。测量来源：`.omo/start-work/artifacts/dictionary-size-compaction/integration.txt`。
 
 ## 覆盖率测试方法论
 
@@ -52,7 +63,7 @@ python omo/dict_coverage_test.py
 ### 测试流程
 
 1. 分别搜集 100 英文 + 100 中文测试词
-2. 对英文：精确匹配或前缀匹配 `dict_` shard 文件
+2. 对英文：精确匹配或前缀匹配 26 个 `word_<a-z>.txt` 紧凑索引
 3. 对中文：精确匹配 `cn_index` bucket 文件（按首字 Unicode % 64）
 4. 输出：精确命中 / 前缀命中 / 未命中的计数和明细
 5. 结果存为 JSON: `.omo/coverage_test_v*.json`
@@ -110,9 +121,11 @@ ECDICT 14,942 条翻译中含有大量中文词组。用 jieba 分词 + 提取�
 | `scripts/generate_watch_dict.py` | 词典生成器（含 CC-CEDICT 集成） |
 | `scripts/generate_watch_dict.py:53` | `CC_STOP_WORDS` 定义 |
 | `scripts/generate_watch_dict.py:67` | `load_cc_cedict()` 函数 |
-| `scripts/generate_watch_dict.py:432-447` | CC-CEDICT→cn_index 融合逻辑 |
+| `scripts/generate_watch_dict.py` | 紧凑索引生成、CC-CEDICT→cn_index 融合、delta-base36 编码 |
 | `data/cedict.txt.gz` | CC-CEDICT 源文件 |
 | `omo/dict_coverage_test.py` | 覆盖率测试脚本 |
+| `omo/dict_compaction_test.py` | delta-base36 编解码契约测试 |
+| `omo/dict_semantic_validator.py` | 词条数量、ID 关系、紧凑 schema 一致性检查 |
 | `omo/coverage_test_v2.py` | V2 测试脚本（新词集） |
 | `.omo/coverage_test.json` | V1 测试结果 |
 | `.omo/coverage_test_v2.json` | V2 测试结果 |

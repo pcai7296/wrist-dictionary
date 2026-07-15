@@ -112,12 +112,12 @@ t0 = time.time()
 
 en_word_set = set()
 for shard_file in sorted((DICT_DIR / "words").iterdir()):
-    if not shard_file.name.startswith("dict_"):
+    if not shard_file.name.startswith("word_"):
         continue
     with open(shard_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
-            if len(parts) >= 1:
+            if len(parts) == 3:
                 en_word_set.add(parts[0].lower().strip())
 
 # cn_index
@@ -142,13 +142,12 @@ def search_english(word):
     if low in en_word_set:
         return "exact"
     # prefix match
-    for shard_file in sorted((DICT_DIR / "words").iterdir()):
-        if not shard_file.name.startswith("dict_"):
-            continue
+    shard_file = DICT_DIR / "words" / f"word_{low[:1]}.txt"
+    if shard_file.exists():
         with open(shard_file, "r", encoding="utf-8") as f:
             for line in f:
                 parts = line.strip().split("\t")
-                if len(parts) >= 1 and parts[0].lower().startswith(low):
+                if len(parts) == 3 and parts[0].lower().startswith(low):
                     return "prefix"
     return "miss"
 

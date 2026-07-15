@@ -1,3 +1,4 @@
+# noqa: SIZE_OK - existing generator is intentionally a single deterministic pipeline.
 import csv
 import gzip
 import json
@@ -19,6 +20,12 @@ OUT = ROOT / "src" / "common" / "dict"
 ENTRY_SHARD_SIZE = 500
 ZH_BUCKET_COUNT = 64
 XLSX_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+BASE36_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
+BASE36_TOKEN = re.compile(r"^[0-9a-z]+$")
+
+
+class DictionaryFormatError(ValueError):
+    """Raised when compact dictionary data violates its wire contract."""
 
 
 def clean_text(value):
@@ -115,6 +122,48 @@ def zh_bucket_for(char):
 
 def entry_shard_for(entry_id):
     return f"{entry_id // ENTRY_SHARD_SIZE:02d}"
+
+
+def to_base36(value):
+    if value < 0:
+        raise DictionaryFormatError("base36 value must be non-negative")
+    if value == 0:
+        return "0"
+    digits = []
+    while value:
+        value, remainder = divmod(value, 36)
+        digits.append(BASE36_DIGITS[remainder])
+    return "".join(reversed(digits))
+
+
+def encode_delta_base36(entry_ids):
+    previous = 0
+    tokens = []
+    for position, entry_id in enumerate(entry_ids):
+        if entry_id < 0:
+            raise DictionaryFormatError("entry IDs must be non-negative")
+        if position and entry_id <= previous:
+            raise DictionaryFormatError("entry IDs must be strictly increasing")
+        tokens.append(to_base36(entry_id - previous))
+        previous = entry_id
+    if not tokens:
+        raise DictionaryFormatError("entry ID list must not be empty")
+    return ",".join(tokens)
+
+
+def decode_delta_base36(value):
+    if not value:
+        raise DictionaryFormatError("delta-base36 list must not be empty")
+    result = []
+    current = 0
+    for token in value.split(","):
+        if not BASE36_TOKEN.fullmatch(token):
+            raise DictionaryFormatError(f"invalid delta-base36 token: {token!r}")
+        current += int(token, 36)
+        if result and current <= result[-1]:
+            raise DictionaryFormatError("decoded IDs must be strictly increasing")
+        result.append(current)
+    return result
 
 
 def parse_exchange(exchange):
@@ -301,8 +350,7 @@ def main():
     (OUT / "inflect_reverse").mkdir(parents=True)
     (OUT / "cn_index").mkdir(parents=True)
 
-    word_shards = {}
-    first_index = {}
+    word_indexes = {letter: [] for letter in "abcdefghijklmnopqrstuvwxyz"}
     inflect = {}
     reverse_inflect = {}
     entry_shards = {}
@@ -324,9 +372,8 @@ def main():
         return len(inflect[form_key][form]) > before
 
     for entry_id, row in enumerate(rows):
-        shard = key_for(row["word"])
-        word_shards.setdefault(shard, []).append(row)
-        first_index.setdefault(shard[0], set()).add(shard)
+        first_letter = row["word"].lower()[0]
+        word_indexes[first_letter].append((entry_id, row))
         entry_shard = entry_shard_for(entry_id)
         entry_shards.setdefault(entry_shard, []).append((entry_id, row))
 
@@ -351,27 +398,14 @@ def main():
         if add_inflect_link(form, base):
             rule_links_added += 1
 
-    for shard, shard_rows in sorted(word_shards.items()):
-        shard_rows.sort(key=lambda item: item["word"].lower())
+    for first_letter, indexed_rows in sorted(word_indexes.items()):
+        indexed_rows.sort(key=lambda item: item[1]["word"].lower())
         lines = []
-        for row in shard_rows:
-            lines.append(
-                "\t".join(
-                    [
-                        row["word"],
-                        row["phonetic"],
-                        row["translation"],
-                        row["tag"],
-                        row["exchange"],
-                    ]
-                )
-            )
-        (OUT / "words" / f"dict_{shard}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    index_lines = []
-    for first, shards in sorted(first_index.items()):
-        index_lines.append(first + "\t" + ",".join(sorted(shards)))
-    (OUT / "index_en.txt").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
+        for entry_id, row in indexed_rows:
+            lines.append("\t".join([row["word"], str(entry_id), row["tag"]]))
+        (OUT / "words" / f"word_{first_letter}.txt").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
 
     for shard, forms in sorted(inflect.items()):
         lines = []
@@ -451,28 +485,42 @@ def main():
         print("  [CC-CEDICT] 跳过（文件未找到）")
 
     cn_phrase_count = 0
+    cn_link_count = 0
     for bucket in sorted(cn_index):
         lines = []
         for phrase in sorted(cn_index[bucket]):
-            ids = ",".join(str(eid) for eid in sorted(cn_index[bucket][phrase]))
+            ids = encode_delta_base36(sorted(cn_index[bucket][phrase]))
             lines.append(f"{phrase}\t{ids}")
             cn_phrase_count += 1
+            cn_link_count += len(cn_index[bucket][phrase])
         (OUT / "cn_index" / f"cn_{bucket}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     zh_char_count = 0
+    zh_link_count = 0
     for bucket, chars in sorted(zh_index.items()):
         lines = []
         for char, entry_ids in sorted(chars.items()):
-            lines.append(char + "\t" + ",".join(str(entry_id) for entry_id in entry_ids))
+            lines.append(char + "\t" + encode_delta_base36(sorted(entry_ids)))
             zh_char_count += 1
+            zh_link_count += len(entry_ids)
         (OUT / "zh_index" / f"zh_{bucket}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     stats = {
         "source": str(SOURCE),
         "headwords": len(rows),
-        "wordShards": len(word_shards),
+        "schema": "compact-v1",
+        "wordIndexFormat": "word\\tentryId\\ttag",
+        "wordIndexFiles": len(word_indexes),
+        "wordIndexEntries": len(rows),
+        "wordShards": len(word_indexes),
+        "chineseIdEncoding": "delta-base36",
+        "chineseIdOrdering": "strictly-increasing",
         "inflectShards": len(inflect),
         "inflectReverseShards": len(reverse_inflect),
+        "inflectLinks": sum(len(bases) for forms in inflect.values() for bases in forms.values()),
+        "inflectReverseLinks": sum(
+            len(forms) for bases in reverse_inflect.values() for forms in bases.values()
+        ),
         "exchangeLinks": exchange_links,
         "wordFamilySource": word_family_stats["source"],
         "wordFamilySourceUrl": word_family_stats["sourceUrl"],
@@ -488,8 +536,10 @@ def main():
         "entryShardSize": ENTRY_SHARD_SIZE,
         "zhBuckets": len(zh_index),
         "zhChars": zh_char_count,
+        "zhIndexLinks": zh_link_count,
         "cnIndexBuckets": len(cn_index),
         "cnIndexPhrases": cn_phrase_count,
+        "cnIndexLinks": cn_link_count,
         "ccCedictSource": str(CCEDICT_SOURCE) if CCEDICT_SOURCE.exists() else "",
         "ccCedictMerged": ccedict_added,
         "resultLimit": 20,

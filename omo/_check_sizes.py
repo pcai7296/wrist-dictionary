@@ -1,13 +1,24 @@
-import os
-# Check english_suggestions and InputMethod sizes
-f1 = r'J:\code\MI band\腕上词典\src\common\english_suggestions.js'
-f2 = r'J:\code\MI band\腕上词典\src\components\InputMethod'
-for root, dirs, files in os.walk(f2):
-    for f in files:
-        fp = os.path.join(root, f)
-        sz = os.path.getsize(fp)
-        rel = os.path.relpath(fp, f2)
-        print(f'  {rel}: {sz:,} bytes ({sz/1024:.1f} KB)')
+"""Report compact dictionary index and input-method asset sizes."""
 
-print()
-print(f'english_suggestions.js: {os.path.getsize(f1):,} bytes')
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+WORD_DIR = ROOT / "src" / "common" / "dict" / "words"
+INPUT_METHOD_DIR = ROOT / "src" / "components" / "InputMethod"
+
+
+word_files = sorted(WORD_DIR.glob("word_*.txt"))
+word_entries = sum(
+    1
+    for path in word_files
+    for line in path.read_text(encoding="utf-8").splitlines()
+    if line
+)
+word_bytes = sum(path.stat().st_size for path in word_files)
+print(f"Compact word index: {word_entries:,} entries, {word_bytes:,} bytes")
+
+for path in sorted(item for item in INPUT_METHOD_DIR.rglob("*") if item.is_file()):
+    size = path.stat().st_size
+    relative = path.relative_to(INPUT_METHOD_DIR)
+    print(f"  {relative}: {size:,} bytes ({size / 1024:.1f} KB)")

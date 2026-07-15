@@ -1,46 +1,54 @@
+# noqa: SIZE_OK - existing report script keeps its fixtures and rendering together.
 """
 腕上词典 — 搜索命中率覆盖率测试脚本
 模拟搜索 100 个英语 + 100 个中文（中考/高考范围）词汇，
 统计直接命中、前缀命中、未命中，输出详细报告。
 """
-import json, os, re, time
+import json, os, re, sys, time
 from pathlib import Path
 
 # ── 配置 ──
 ROOT = Path(__file__).resolve().parents[1]
 DICT_DIR = ROOT / "src" / "common" / "dict"
 
+
+class DictionaryFormatError(ValueError):
+    """表示生成词库中的紧凑字段不合法。"""
+
 # ── 1. 加载词库 ──
 print("=" * 60)
 print("加载词库数据...")
 t0 = time.time()
 
-# 加载英文单词 shard 索引
-en_index = {}
-with open(DICT_DIR / "index_en.txt", "r", encoding="utf-8") as f:
-    for line in f:
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split("\t")
-        if len(parts) >= 2:
-            en_index[parts[0]] = parts[1].split(",")
-
-# 加载所有英文 shard → word set
+# 加载 26 个首字母英文索引 → word set
 en_word_set = set()
 en_word_map = {}  # word -> (phonetic, translation, tag)
 shard_count = 0
 for shard_file in sorted((DICT_DIR / "words").iterdir()):
-    if not shard_file.name.startswith("dict_"):
+    if not shard_file.name.startswith("word_"):
         continue
     shard_count += 1
     with open(shard_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
-            if len(parts) >= 3:
+            if len(parts) == 3:
                 word = parts[0].lower()
                 en_word_set.add(word)
-                en_word_map[word] = (parts[1], parts[2], parts[3] if len(parts) > 3 else "")
+                en_word_map[word] = ("", "", parts[2])
+
+
+def decode_delta_base36(value):
+    """解码递增 entryId 的 base36 差值列表。"""
+    result = []
+    current = 0
+    for token in value.split(","):
+        if not token or not re.fullmatch(r"[0-9a-z]+", token):
+            raise DictionaryFormatError(f"非法 delta-base36 token: {token!r}")
+        current += int(token, 36)
+        if result and current <= result[-1]:
+            raise DictionaryFormatError("entryId 必须严格递增")
+        result.append(current)
+    return result
 
 # 加载 cn_index
 cn_index = {}
@@ -56,7 +64,7 @@ for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
             parts = line.strip().split("\t")
             if len(parts) >= 2:
                 phrase = parts[0]
-                entry_ids = parts[1].split(",")
+                entry_ids = decode_delta_base36(parts[1])
                 bucket_map[phrase] = entry_ids
                 cn_phrase_total += 1
     cn_index[cn_file.stem.replace("cn_", "")] = bucket_map
@@ -125,6 +133,9 @@ CHINESE_TEST_WORDS = [
     "配置", "整合", "优化", "升级", "转型",
 ]
 
+if "--force-miss" in sys.argv[1:]:
+    ENGLISH_TEST_WORDS[0] = "__forced_coverage_miss__"
+
 
 # ── 3. 模拟搜索逻辑 ──
 
@@ -136,18 +147,15 @@ def search_english(word):
     if low in en_word_set:
         return ("exact", en_word_map[low])
     
-    # 前缀匹配（走 shard 扫描）
+    # 前缀匹配（走首字母索引扫描）
     first_char = low[0] if low else ""
-    if first_char in en_index:
-        for shard in en_index[first_char]:
-            shard_file = DICT_DIR / "words" / f"dict_{shard}.txt"
-            if not shard_file.exists():
-                continue
-            with open(shard_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    parts = line.strip().split("\t")
-                    if len(parts) >= 3 and parts[0].lower().startswith(low):
-                        return ("prefix", (parts[1], parts[2], parts[3] if len(parts) > 3 else ""))
+    shard_file = DICT_DIR / "words" / f"word_{first_char}.txt"
+    if shard_file.exists():
+        with open(shard_file, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split("\t")
+                if len(parts) == 3 and parts[0].lower().startswith(low):
+                    return ("prefix", ("", "", parts[2]))
     
     return ("miss", None)
 
@@ -364,3 +372,21 @@ with open(ROOT / ".omo" / "coverage_test_result.json", "w", encoding="utf-8") as
     json.dump(output, f, ensure_ascii=False, indent=2)
 
 print(f"\n详细结果已保存至 .omo/coverage_test_result.json")
+
+count_regressions = []
+if len(en_word_set) != 14_942:
+    count_regressions.append(f"English headwords={len(en_word_set)} expected=14942")
+if cn_phrase_total != 122_067:
+    count_regressions.append(f"Chinese phrases={cn_phrase_total} expected=122067")
+if shard_count != 26:
+    count_regressions.append(f"word shards={shard_count} expected=26")
+if cn_bucket_count != 64:
+    count_regressions.append(f"Chinese buckets={cn_bucket_count} expected=64")
+
+if en_miss or cn_miss or count_regressions:
+    details = "; ".join(count_regressions) if count_regressions else "corpus sample miss"
+    print(
+        f"coverage validation failed: English misses={en_miss}, Chinese misses={cn_miss}; {details}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)

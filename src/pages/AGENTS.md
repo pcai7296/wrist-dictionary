@@ -1,0 +1,43 @@
+# Pages — Vela QuickApp Page Modules
+
+## Overview
+
+7 page modules for the wrist dictionary app. Each page is a self-contained .ux SFC.
+
+## Structure
+
+```
+pages/
+├── index/       # Home — 4 main buttons + about/sponsor links (218 lines)
+├── search/      # IME input + cursor editing + autocomplete (573 lines)
+├── results/     # English/Chinese search results (1114 lines)
+├── detail/      # Word detail + favorite toggle (537 lines, 1s cooldown)
+├── records/     # History/favorites list (type param, 319 lines)
+├── about/       # Credits, license — #000000 bg, text clipping known issue
+└── sponsor/     # Donation QR code (99 lines)
+```
+
+## Where to Look
+
+| Task | Location | Notes |
+|------|----------|-------|
+| Add new page | Create dir + .ux + register in manifest.json | Copy swipe-back gesture from existing page |
+| Modify search flow | search/ + results/ | IME events → search logic → display |
+| Edit word display | detail/ | Favorite toggle uses @system.storage |
+| Change home layout | index/ | 4 main buttons + 2 secondary |
+| List management | records/ | Accepts `type` param (history/favorites) |
+
+## Swipe-back gesture (every page)
+
+| Page | Start X <= | End X >= | dY <= |
+|------|------------|----------|-------|
+| Most pages | 53 | 159 | 120 |
+| about.ux | 20 | 180 | 60 |
+
+Copy pattern from any page except about. Uses `getTouchPoint()` + `touchStartX/Y`.
+
+## Conventions
+
+- **Background**: `#020813` on all pages except about (`#000000`)
+- **Text size**: Minimum 18px. Do not go below unless user OKs truncation.
+- **Router quirks**: records→search uses `router.replace` with `autoSearch="1"`; detail→results (inflect) uses `router.replace`.

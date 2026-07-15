@@ -39,6 +39,8 @@ import prompt from "@system.prompt"
 
 const FUZZY_SCAN_LIMIT = 4000
 const FUZZY_POOL_LIMIT = 80
+const MAX_SAFE_ENTRY_ID = 9007199254740991
+const WORD_INDEX_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 
 class LRUCache {
   constructor(max) {
@@ -249,7 +251,7 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2 && parts[0] === firstChar) {
-          done(parts[1].split(","))
+          done(this.decodeDeltaIds(parts[1]))
           return
         }
       }
@@ -308,7 +310,7 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2) {
-          indexMap[parts[0]] = parts[1].split(",")
+          indexMap[parts[0]] = this.decodeDeltaIds(parts[1])
         }
       }
       this.cnIndexCache.set(bucket, indexMap)
@@ -330,7 +332,7 @@ export default {
       // Prefix match fallback: max 20 candidate keys, 10 IDs per key, 50 total
       if (!ids) {
         const candidates = Object.keys(indexMap)
-          .filter(key => key.indexOf(query) === 0)
+          .filter((key) => key.indexOf(query) === 0)
           .slice(0, 20)
 
         const allIds = []
@@ -429,29 +431,21 @@ export default {
       return
     }
 
-    this.readText("/common/dict/index_en.txt", (text) => {
-      const index = {}
-      const lines = text.split("\n")
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
-        if (!line) {
-          continue
-        }
-        const parts = line.split("\t")
-        if (parts.length >= 2) {
-          index[parts[0]] = parts[1].split(",")
-        }
-      }
-      this.shardIndex = index
-      done()
-    })
+    const index = {}
+    for (let i = 0; i < WORD_INDEX_LETTERS.length; i++) {
+      const letter = WORD_INDEX_LETTERS.charAt(i)
+      index[letter] = [letter]
+    }
+    this.shardIndex = index
+    done()
   },
 
   getCandidateShards(query) {
-    if (query.length === 1 && this.shardIndex && this.shardIndex[query]) {
-      return this.shardIndex[query]
+    const first = this.normalizeWord(query).charAt(0)
+    if (first >= "a" && first <= "z") {
+      return [first]
     }
-    return [this.keyFor(query)]
+    return []
   },
 
   collectShardResults(shards, query, results, seen, index, done) {
@@ -461,9 +455,12 @@ export default {
     }
 
     const shard = shards[index]
-    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
-      this.scanWordText(text, query, results, seen, "")
-      this.collectShardResults(shards, query, results, seen, index + 1, done)
+    this.readText("/common/dict/words/word_" + shard + ".txt", (text) => {
+      const candidates = []
+      this.collectCompactWordCandidates(text, query, candidates, seen, "", 20 - results.length)
+      this.hydrateCompactCandidates(candidates, results, 0, () => {
+        this.collectShardResults(shards, query, results, seen, index + 1, done)
+      })
     })
   },
 
@@ -500,19 +497,28 @@ export default {
     }
 
     const base = bases[index]
-    const shard = this.keyFor(base)
-    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
-      this.scanWordText(text, this.normalizeWord(base), results, seen, "变形")
+    const first = this.normalizeWord(base).charAt(0)
+    if (first < "a" || first > "z") {
       this.collectBaseResults(bases, results, seen, index + 1, done)
+      return
+    }
+
+    this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+      const candidates = []
+      this.collectCompactWordCandidates(text, base, candidates, seen, "变形", 1)
+      this.hydrateCompactCandidates(candidates, results, 0, () => {
+        this.collectBaseResults(bases, results, seen, index + 1, done)
+      })
     })
   },
 
-  scanWordText(text, query, results, seen, source) {
-    if (!text) {
+  collectCompactWordCandidates(text, query, candidates, seen, source, limit) {
+    if (!text || limit <= 0) {
       return
     }
+    const normalizedQuery = this.normalizeWord(query)
     const lines = text.split("\n")
-    for (let i = 0; i < lines.length && results.length < 20; i++) {
+    for (let i = 0; i < lines.length && candidates.length < limit; i++) {
       const parts = lines[i].split("\t")
       if (parts.length < 3) {
         continue
@@ -524,16 +530,59 @@ export default {
         continue
       }
       if (source) {
-        if (lower !== query) {
+        if (lower !== normalizedQuery) {
           continue
         }
-      } else if (lower.indexOf(query) !== 0) {
+      } else if (lower.indexOf(normalizedQuery) !== 0) {
         continue
       }
 
+      const entryId = this.parseEntryId(parts[1])
+      if (entryId < 0) {
+        continue
+      }
       seen[lower] = true
-      results.push(this.createResultCard(lower, word, parts[1], parts[2], source || parts[3] || ""))
+      candidates.push({
+        entryId: entryId,
+        lower: lower,
+        word: word,
+        tag: parts[2] || "",
+        source: source
+      })
     }
+  },
+
+  hydrateCompactCandidates(candidates, results, index, done) {
+    if (index >= candidates.length || results.length >= 20) {
+      done()
+      return
+    }
+
+    const candidate = candidates[index]
+    const shard = this.entryShardFor(candidate.entryId)
+    this.loadEntryShard(shard, (entries) => {
+      let nextIndex = index
+      while (nextIndex < candidates.length && results.length < 20) {
+        const next = candidates[nextIndex]
+        if (this.entryShardFor(next.entryId) !== shard) {
+          break
+        }
+        const item = entries[next.entryId]
+        if (item) {
+          results.push(
+            this.createResultCard(
+              next.lower,
+              item.word || next.word,
+              item.phonetic,
+              item.translation,
+              next.source || item.tag || next.tag
+            )
+          )
+        }
+        nextIndex++
+      }
+      this.hydrateCompactCandidates(candidates, results, nextIndex, done)
+    })
   },
 
   collectFuzzyResults(query, done) {
@@ -552,28 +601,30 @@ export default {
         return left.word.length - right.word.length
       })
 
-      const cards = []
-      for (let i = 0; i < items.length && cards.length < 20; i++) {
-        const item = items[i]
-        cards.push(
-          this.createResultCard(item.lower, item.word, item.phonetic, item.translation, "相近")
-        )
+      const candidates = []
+      for (let i = 0; i < items.length; i++) {
+        candidates.push({
+          entryId: items[i].entryId,
+          lower: items[i].lower,
+          word: items[i].word,
+          tag: items[i].tag,
+          source: "相近"
+        })
       }
-      done(cards)
+      const cards = []
+      this.hydrateCompactCandidates(candidates, cards, 0, () => done(cards))
     })
   },
 
   getFuzzyShards(query) {
     const ordered = []
     const seen = {}
-    const first = query.charAt(0)
-    if (this.shardIndex && this.shardIndex[first]) {
-      this.pushUniqueShards(ordered, seen, this.shardIndex[first])
+    const first = this.normalizeWord(query).charAt(0)
+    if (first >= "a" && first <= "z") {
+      this.pushUniqueShards(ordered, seen, [first])
     }
-    if (this.shardIndex) {
-      for (const key in this.shardIndex) {
-        this.pushUniqueShards(ordered, seen, this.shardIndex[key])
-      }
+    for (let i = 0; i < WORD_INDEX_LETTERS.length; i++) {
+      this.pushUniqueShards(ordered, seen, [WORD_INDEX_LETTERS.charAt(i)])
     }
     return ordered
   },
@@ -599,7 +650,7 @@ export default {
     }
 
     const shard = shards[index]
-    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
+    this.readText("/common/dict/words/word_" + shard + ".txt", (text) => {
       this.scanFuzzyWordText(text, query, items, seen)
       this.collectFuzzyShardResults(shards, query, items, seen, index + 1, done)
     })
@@ -619,7 +670,7 @@ export default {
     ) {
       this.fuzzyWordsChecked++
       const parts = lines[i].split("\t")
-      if (parts.length < 4) {
+      if (parts.length < 3) {
         continue
       }
       const lower = this.normalizeWord(parts[0])
@@ -630,14 +681,18 @@ export default {
       if (distance < 0 || distance > 2) {
         continue
       }
+      const entryId = this.parseEntryId(parts[1])
+      if (entryId < 0) {
+        continue
+      }
       seen[lower] = true
       items.push({
+        entryId: entryId,
         lower: lower,
         word: parts[0],
-        phonetic: parts[1],
-        translation: parts[2],
+        tag: parts[2] || "",
         distance: distance,
-        score: this.scoreFuzzyCandidate(query, lower, parts[3] || "")
+        score: this.scoreFuzzyCandidate(query, lower, parts[2] || "")
       })
     }
   },
@@ -924,9 +979,59 @@ export default {
     return hex
   },
 
+  decodeDeltaIds(value) {
+    if (typeof value !== "string") {
+      return []
+    }
+
+    const normalized = value.trim()
+    if (!normalized) {
+      return []
+    }
+    const tokens = normalized.split(",")
+    const ids = []
+    let currentId = 0
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]
+      if (!token || !/^[0-9a-z]+$/.test(token)) {
+        return []
+      }
+
+      let delta = 0
+      for (let j = 0; j < token.length; j++) {
+        const ch = token.charAt(j)
+        const code = ch.charCodeAt(0)
+        const digit = code >= 48 && code <= 57 ? code - 48 : code - 87
+        if (digit < 0 || digit >= 36 || delta > Math.floor((MAX_SAFE_ENTRY_ID - digit) / 36)) {
+          return []
+        }
+        delta = delta * 36 + digit
+      }
+
+      if (i > 0 && delta === 0) {
+        return []
+      }
+      if (currentId > MAX_SAFE_ENTRY_ID - delta) {
+        return []
+      }
+      currentId += delta
+      ids.push(currentId)
+    }
+    return ids
+  },
+
   parseEntryId(value) {
-    const id = parseInt(value)
-    if (isNaN(id)) {
+    if (typeof value === "number") {
+      if (value < 0 || value > MAX_SAFE_ENTRY_ID || Math.floor(value) !== value) {
+        return -1
+      }
+      return value
+    }
+    if (typeof value !== "string" || !/^[0-9]+$/.test(value)) {
+      return -1
+    }
+    const id = parseInt(value, 10)
+    if (id < 0 || id > MAX_SAFE_ENTRY_ID || Math.floor(id) !== id) {
       return -1
     }
     return id
