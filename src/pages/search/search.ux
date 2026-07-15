@@ -144,7 +144,7 @@ export default {
 
   getMaxLength(screenShape, screenWidth) {
     if (screenShape === "circle") {
-      return 15
+      return 12
     }
     if (screenShape === "rect") {
       return screenWidth >= 400 ? 15 : 11
