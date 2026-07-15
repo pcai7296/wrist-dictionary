@@ -268,11 +268,11 @@ export default {
 
 .title-rect,
 .title-circle {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
 .page-circle {
-  padding-top: 46px;
+  padding-top: 32px;
 }
 
 .button-group-rect {
@@ -294,7 +294,7 @@ export default {
 .main-button-rect,
 .main-button-circle {
   width: 47%;
-  height: 72px;
+  height: 68px;
   margin-bottom: 12px;
 }
 
@@ -308,7 +308,45 @@ export default {
 
 .bottom-row-rect,
 .bottom-row-circle {
-  margin-top: 8px;
+  margin-top: 10px;
+}
+
+.icon-card-rect {
+  display: flex;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 16px;
+  border-radius: 26px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-rect {
+  display: flex;
+  width: 86px;
+  height: 86px;
+}
+
+.icon-card-circle {
+  display: flex;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 14px;
+  border-radius: 24px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-circle {
+  display: flex;
+  width: 78px;
+  height: 78px;
 }
 
 .about-button {
