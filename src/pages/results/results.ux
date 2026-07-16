@@ -4,7 +4,11 @@
       <text class="back-text">返回</text>
     </div>
 
-    <text class="query-text">{{ queryText }}</text>
+    <marquee if="{{ queryMarqueeOn }}" id="query-marquee" class="query-marquee"
+      scrollamount="{{ queryMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+      {{ queryText }}   {{ queryText }}
+    </marquee>
+    <text if="{{ !queryMarqueeOn }}" class="query-text">{{ queryText }}</text>
     <text class="status-text" if="{{ statusText }}">{{ statusText }}</text>
 
     <list class="result-list" if="{{ resultCards.length > 0 }}" style="width: {{cardWidth}}px;">
@@ -17,7 +21,12 @@
       >
         <div class="result-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openDetail(item)">
           <div class="result-head">
-            <text class="result-word">{{ item.word }}</text>
+            <text if="{{ !item.wordMarqueeOn }}" class="result-word">{{ item.word }}</text>
+            <text if="{{ item.wordMarqueeOn && !marqueeArmed }}" class="result-word">{{ item.word }}</text>
+            <marquee if="{{ item.wordMarqueeOn && marqueeArmed }}" class="result-word-marquee"
+              scrollamount="{{ item.wordMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+              {{ item.word }}   {{ item.word }}
+            </marquee>
             <text class="result-tag">{{ item.tag }}</text>
           </div>
           <text class="result-phonetic">{{ item.phonetic }}</text>
@@ -94,7 +103,12 @@ export default {
     touchStartY: -1,
     destroyed: false,
     cardWidth: 0,
-    contentWidth: 0
+    contentWidth: 0,
+    screenWidth: 0,
+    queryMarqueeOn: false,
+    queryMarqueeSpeed: 40,
+    wordMarqueeThreshold: 0,
+    marqueeArmed: false
   },
 
   onInit() {
@@ -102,10 +116,46 @@ export default {
     this.entryCache = new LRUCache(3)
     this.cnIndexCache = new LRUCache(10)
     const sw = this.$app.$def.data.screenWidth || 212
+    this.screenWidth = sw
     this.cardWidth = sw - 20
     this.contentWidth = this.cardWidth - 24
+    this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
     this.queryText = this.normalizeWord(this.query)
+    this.applyQueryMarquee(this.queryText)
     this.performSearch()
+  },
+
+  onShow() {
+    // 1.5s 让人先看清单词，再齐步启动所有跑马灯
+    setTimeout(() => {
+      this.marqueeArmed = true
+    }, 1500)
+  },
+
+  resolveWordMarqueeThreshold(sw) {
+    if (sw === 192) return 9
+    if (sw === 212) return 10
+    if (sw === 336) return 20
+    if (sw === 432) return 25
+    if (sw === 466) return 25
+    return 10
+  },
+
+  applyQueryMarquee(text) {
+    if (text && text.length > 12) {
+      this.queryMarqueeOn = true
+      const extra = text.length - 12
+      this.queryMarqueeSpeed = Math.max(40, Math.min(60, Math.round(40 + extra * 1.5)))
+    } else {
+      this.queryMarqueeOn = false
+      this.queryMarqueeSpeed = 40
+    }
+  },
+
+  calcCardWordMarqueeSpeed(word) {
+    // 速度 ≈ 词长 × 4，让长词追上视觉上的同步循环。除非 word 太长会失控，用 60 封顶。
+    const len = (word || "").length
+    return Math.min(60, Math.max(40, len * 4))
   },
 
   goBack() {
@@ -123,7 +173,7 @@ export default {
         word: item.word,
         phonetic: item.rawPhonetic || "",
         translation: item.translation || "",
-        tag: item.tag || "",
+        tag: item.rawTag || item.tag || "",
         searchMode: this.searchMode || "",
         inflectDepth: this.inflectDepth || "0"
       }
@@ -910,6 +960,11 @@ export default {
     const safeLines = lines.length > 0 ? lines : [""]
     const lineHeight = 22
     const cardHeight = Math.max(100, 64 + safeLines.length * lineHeight)
+    const bestTag = this.highestTag(tag)
+    const showTag = this.canFitWithTag(word || "", bestTag)
+    const wordLen = (word || "").length
+    const wordMarqueeOn = wordLen > this.wordMarqueeThreshold
+    const wordMarqueeSpeed = wordMarqueeOn ? this.calcCardWordMarqueeSpeed(word) : 40
 
     return {
       id: id,
@@ -918,10 +973,30 @@ export default {
       rawPhonetic: phonetic || "",
       translation: translation || "",
       translationLines: safeLines,
-      tag: this.highestTag(tag),
+      tag: showTag ? bestTag : "",
+      rawTag: bestTag,
       cardHeight: cardHeight,
-      itemHeight: cardHeight + 10
+      itemHeight: cardHeight + 10,
+      wordMarqueeOn: wordMarqueeOn,
+      wordMarqueeSpeed: wordMarqueeSpeed
     }
+  },
+
+  canFitWithTag(word, tag) {
+    if (!tag) return true
+    const WORD_FONT = 28
+    const TAG_FONT = 18
+    const TAG_MARGIN = 8
+    const CARD_PADDING = 24
+    const WORD_GLYPH_RATIO = 0.72
+    const TAG_GLYPH_RATIO = 0.6
+    const SAFETY = 4
+
+    const safeLen = (word || "").length
+    if (safeLen === 0) return true
+    const wordW = safeLen * WORD_FONT * WORD_GLYPH_RATIO
+    const tagW = tag.length * TAG_FONT * TAG_GLYPH_RATIO + TAG_MARGIN + SAFETY
+    return wordW + tagW <= this.cardWidth - CARD_PADDING
   },
 
   wrapText(value, maxWidth) {
@@ -1265,7 +1340,8 @@ export default {
   text-align: center;
 }
 
-.query-text {
+.query-text,
+.query-marquee {
   width: 168px;
   height: 36px;
   margin-top: 12px;
@@ -1274,6 +1350,11 @@ export default {
   font-size: 24px;
   font-weight: 800;
   text-align: center;
+}
+
+.query-marquee {
+  lines: 1;
+  text-overflow: clip;
 }
 
 .status-text {
@@ -1311,12 +1392,18 @@ export default {
   align-items: center;
 }
 
-.result-word {
+.result-word,
+.result-word-marquee {
   flex: 1;
   height: 38px;
   color: #ffffff;
   font-size: 28px;
   font-weight: 800;
+}
+
+.result-word-marquee {
+  lines: 1;
+  text-overflow: clip;
 }
 
 .result-tag {
