@@ -4,18 +4,22 @@
       <text class="back-text">返回</text>
     </div>
 
-    <text class="word-text">{{ wordText }}</text>
-    <text class="phonetic-text">{{ phoneticText }}</text>
+    <div class="word-area">
+      <text class="word-text" style="width: {{contentWidth}}px;">{{ wordText }}</text>
+      <text class="phonetic-text" style="width: {{contentWidth}}px;">{{ phoneticText }}</text>
+    </div>
 
-    <list class="meaning-list">
-      <list-item class="meaning-item" type="meaningLine" for="{{ line in translationLines }}">
-        <text class="meaning-line">{{ line }}</text>
-      </list-item>
-    </list>
+    <div class="content-area">
+      <list class="meaning-list" style="width: {{cardWidth}}px;">
+        <list-item class="meaning-item" type="meaningLine" for="{{ item in displayLines }}">
+          <text class="{{ item.isTag ? 'tag-line' : 'meaning-line' }}">{{ item.text }}</text>
+        </list-item>
+      </list>
+    </div>
 
-    <div class="bottom-row">
-      <input class="bottom-button inflect-button" type="button" value="查变形" @click="goInflect" />
-      <input class="bottom-button favorite-button" type="button" value="{{ favoriteLabel }}" @click="toggleFavorite" />
+    <div class="bottom-row" style="{{ bottomStyle }}">
+      <input class="bottom-button inflect-button" style="{{ inflectBtnStyle }}" type="button" value="查变形" @click="goInflect" />
+      <input class="bottom-button favorite-button" style="{{ favoriteBtnStyle }}" type="button" value="{{ favoriteLabel }}" @click="toggleFavorite" />
     </div>
   </div>
 </template>
@@ -41,7 +45,10 @@ export default {
     phoneticText: "",
     translationText: "",
     tagText: "",
+    tagLines: [],
     translationLines: [],
+    cardWidth: 188,
+    contentWidth: 164,
     favoriteLabel: "收藏",
     fileCache: {},
     sourceWord: "",
@@ -57,14 +64,40 @@ export default {
   },
 
   onInit() {
+    const sw = this.$app.$def.data.screenWidth || 212
+    this.cardWidth = sw - 20
+    this.contentWidth = this.cardWidth - 24
+    this.isRoundScreen = sw === 466
+    this.isCapsule = sw === 192 || sw === 212
+    if (this.isRoundScreen) {
+      this.bottomStyle = "justify-content: center;"
+      this.inflectBtnStyle = "margin-right: 5px;"
+      this.favoriteBtnStyle = "margin-left: 5px;"
+    } else if (this.isCapsule) {
+      this.bottomStyle = "margin-bottom: 40px;"
+      this.inflectBtnStyle = ""
+      this.favoriteBtnStyle = ""
+    } else {
+      this.bottomStyle = ""
+      this.inflectBtnStyle = ""
+      this.favoriteBtnStyle = ""
+    }
     this.wordText = this.word || ""
     this.phoneticText = this.phonetic ? "/" + this.phonetic + "/" : ""
     this.translationText = this.translation || ""
     this.tagText = this.tag || ""
-    const wrapW = (this.$app.$def.data.screenWidth || 212) - 48
+    const tagLines = this.tagText ? this.tagText.split(" ") : []
+    const wrapW = this.contentWidth - 24
     this.translationLines = this.wrapText(this.translationText, wrapW)
     if (this.translationLines.length === 0) {
       this.translationLines = [""]
+    }
+    this.displayLines = []
+    for (let i = 0; i < this.translationLines.length; i++) {
+      this.displayLines.push({ text: this.translationLines[i], isTag: false })
+    }
+    for (let i = 0; i < tagLines.length; i++) {
+      this.displayLines.push({ text: tagLines[i], isTag: true })
     }
     this.refreshFavoriteState()
   },
@@ -443,76 +476,63 @@ export default {
   text-align: center;
 }
 
-.word-text {
-  width: 168px;
-  height: 34px;
+.word-area {
   margin-top: 14px;
+  margin-left: 15px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.word-text {
+  height: 40px;
   color: #ffffff;
-  font-size: 27px;
+  font-size: 32px;
   font-weight: 800;
   text-align: left;
 }
 
 .phonetic-text {
-  width: 168px;
-  height: 20px;
+  height: 36px;
   color: #a9c8f6;
-  font-size: 14px;
+  font-size: 28px;
   text-align: left;
 }
 
-.inflect-section {
-  width: 168px;
-  margin-top: 4px;
+.content-area {
+  flex: 1;
   flex-direction: column;
-}
-
-.inflect-row {
-  width: 168px;
-  height: 20px;
-  flex-direction: row;
+  justify-content: center;
   align-items: center;
 }
 
-.inflect-label {
-  color: #a9c8f6;
-  font-size: 13px;
-  height: 20px;
-  margin-right: 4px;
-}
-
-.inflect-link {
-  color: #0b65ea;
-  font-size: 14px;
-  height: 20px;
-  margin-right: 8px;
-}
-
 .meaning-list {
-  width: 188px;
   height: 286px;
   margin-top: 8px;
 }
 
 .meaning-item {
-  width: 188px;
-  height: 24px;
+  height: 32px;
 }
 
 .meaning-line {
-  width: 168px;
-  height: 24px;
+  height: 32px;
   margin-left: 10px;
   color: #e9f2ff;
-  font-size: 18px;
+  font-size: 27px;
   lines: 1;
   text-overflow: clip;
 }
 
+.tag-line {
+  height: 34px;
+  margin-left: 10px;
+  color: #6ba3e8;
+  font-size: 28px;
+}
+
 .bottom-row {
-  width: 176px;
   height: 48px;
-  margin-top: 2px;
+  margin-bottom: 10px;
   flex-direction: row;
   justify-content: space-between;
 }

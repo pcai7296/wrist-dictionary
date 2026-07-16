@@ -16,6 +16,9 @@ WORD_FAMILY_SOURCE = ROOT / "data" / "bnc_coca_word_family_lists_v2.xlsx"
 WORD_FAMILY_SOURCE_URL = "https://www.eapfoundation.com/vocab/general/bnccoca/"
 CCEDICT_SOURCE = ROOT / "data" / "cedict.txt.gz"
 CCEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz"
+WORDNET_DIR = ROOT / "data" / "dict"
+WORDNET_FILES = {"n": "data.noun", "v": "data.verb", "a": "data.adj", "r": "data.adv"}
+WORDNET_VALID_POS = {"n", "v", "a", "r"}
 OUT = ROOT / "src" / "common" / "dict"
 ENTRY_SHARD_SIZE = 500
 ZH_BUCKET_COUNT = 64
@@ -323,6 +326,84 @@ def load_rule_links(word_set):
     return sorted(links)
 
 
+def load_wordnet_derived_links(word_set):
+    """Load derivationally related forms from WordNet data files (+ pointers).
+
+    Returns dict with stats and list of (form, base) links.
+    """
+    stats = {
+        "available": WORDNET_DIR.exists(),
+        "source": str(WORDNET_DIR),
+        "totalLinks": 0,
+        "matchedLinks": 0,
+        "links": [],
+    }
+    if not WORDNET_DIR.exists():
+        return stats
+
+    # Build offset -> lemmas from data files, and collect + pointer links
+    all_links = set()
+
+    for pos_code, filename in WORDNET_FILES.items():
+        filepath = WORDNET_DIR / filename
+        if not filepath.exists():
+            continue
+
+        offset_to_lemmas = {}
+        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.rstrip("\n\r")
+                if not line or not re.match(r"^\d{8}\s", line):
+                    continue
+                pipe_pos = line.find("|")
+                if pipe_pos < 0:
+                    continue
+                parts = line[:pipe_pos].rstrip().split()
+                if len(parts) < 7:
+                    continue
+                offset = parts[0]
+                try:
+                    nwords = int(parts[3])
+                except ValueError:
+                    continue
+                lemmas = []
+                for i in range(nwords):
+                    idx = 4 + 2 * i
+                    if idx < len(parts):
+                        lemmas.append(parts[idx])
+                offset_to_lemmas[offset] = lemmas
+                nptr_idx = 4 + 2 * nwords
+                if nptr_idx >= len(parts):
+                    continue
+                try:
+                    nptr = int(parts[nptr_idx])
+                except ValueError:
+                    continue
+                ptr_idx = nptr_idx + 1
+                for _ in range(nptr):
+                    if ptr_idx + 2 >= len(parts):
+                        break
+                    ptr_symbol = parts[ptr_idx]
+                    ptr_offset = parts[ptr_idx + 1]
+                    ptr_pos = parts[ptr_idx + 2]
+                    ptr_idx += 4
+                    if ptr_symbol == "+" and ptr_pos in WORDNET_VALID_POS:
+                        for lemma in lemmas:
+                            target_lemmas = offset_to_lemmas.get(ptr_offset, [])
+                            for tl in target_lemmas:
+                                if tl.lower() != lemma.lower():
+                                    all_links.add((tl.lower(), lemma.lower()))
+
+    stats["totalLinks"] = len(all_links)
+    matched = []
+    for form, base in all_links:
+        if form in word_set and base in word_set and form != base:
+            matched.append((form, base))
+    stats["matchedLinks"] = len(matched)
+    stats["links"] = sorted(matched)
+    return stats
+
+
 def main():
     rows = []
     with SOURCE.open("r", encoding="utf-8", newline="") as handle:
@@ -397,6 +478,12 @@ def main():
     for form, base in rule_links:
         if add_inflect_link(form, base):
             rule_links_added += 1
+
+    wordnet_stats = load_wordnet_derived_links(word_set)
+    wordnet_links_added = 0
+    for form, base in wordnet_stats["links"]:
+        if add_inflect_link(form, base):
+            wordnet_links_added += 1
 
     for first_letter, indexed_rows in sorted(word_indexes.items()):
         indexed_rows.sort(key=lambda item: item[1]["word"].lower())
@@ -532,6 +619,11 @@ def main():
         "wordFamilyLinksAdded": word_family_links_added,
         "ruleMatchedLinks": len(rule_links),
         "ruleLinksAdded": rule_links_added,
+        "wordnetSource": wordnet_stats["source"],
+        "wordnetAvailable": wordnet_stats["available"],
+        "wordnetTotalLinks": wordnet_stats["totalLinks"],
+        "wordnetMatchedLinks": wordnet_stats["matchedLinks"],
+        "wordnetLinksAdded": wordnet_links_added,
         "entryShards": len(entry_shards),
         "entryShardSize": ENTRY_SHARD_SIZE,
         "zhBuckets": len(zh_index),

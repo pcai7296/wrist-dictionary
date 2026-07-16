@@ -7,15 +7,15 @@
     <text class="query-text">{{ queryText }}</text>
     <text class="status-text" if="{{ statusText }}">{{ statusText }}</text>
 
-    <list class="result-list" if="{{ resultCards.length > 0 }}">
+    <list class="result-list" if="{{ resultCards.length > 0 }}" style="width: {{cardWidth}}px;">
       <list-item
         class="result-item"
         type="resultCard"
         for="{{ item in resultCards }}"
         tid="id"
-        style="height: {{ item.itemHeight }}px;"
+        style="width: {{cardWidth}}px; height: {{ item.itemHeight }}px;"
       >
-        <div class="result-card" style="height: {{ item.cardHeight }}px;" @click="openDetail(item)">
+        <div class="result-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openDetail(item)">
           <div class="result-head">
             <text class="result-word">{{ item.word }}</text>
             <text class="result-tag">{{ item.tag }}</text>
@@ -92,13 +92,18 @@ export default {
     toastCooldown: 1500,
     touchStartX: -1,
     touchStartY: -1,
-    destroyed: false
+    destroyed: false,
+    cardWidth: 0,
+    contentWidth: 0
   },
 
   onInit() {
     this.fileCache = new LRUCache(5)
     this.entryCache = new LRUCache(3)
     this.cnIndexCache = new LRUCache(10)
+    const sw = this.$app.$def.data.screenWidth || 212
+    this.cardWidth = sw - 20
+    this.contentWidth = this.cardWidth - 24
     this.queryText = this.normalizeWord(this.query)
     this.performSearch()
   },
@@ -162,9 +167,8 @@ export default {
 
       const results = []
       const seen = {}
-      const shards = this.getCandidateShards(normalized)
 
-      this.collectShardResults(shards, normalized, results, seen, 0, () => {
+      if (this.searchMode === "inflect") {
         this.collectInflectResult(normalized, results, seen, () => {
           if (token !== this.searchToken) {
             return
@@ -172,7 +176,19 @@ export default {
 
           this.finishEnglishSearch(normalized, token, results)
         })
-      })
+      } else {
+        const shards = this.getCandidateShards(normalized)
+
+        this.collectShardResults(shards, normalized, results, seen, 0, () => {
+          this.collectInflectResult(normalized, results, seen, () => {
+            if (token !== this.searchToken) {
+              return
+            }
+
+            this.finishEnglishSearch(normalized, token, results)
+          })
+        })
+      }
     })
   },
 
@@ -486,7 +502,109 @@ export default {
           break
         }
       }
-      this.collectBaseResults(bases, results, seen, 0, done)
+      this.collectBaseResults(bases, results, seen, 0, () => {
+        this.collectReverseInflectResult(query, results, seen, done)
+      })
+    })
+  },
+
+  collectReverseInflectResult(query, results, seen, done) {
+    if (results.length >= 20) {
+      done()
+      return
+    }
+
+    const shard = this.keyFor(query)
+    this.readText("/common/dict/inflect_reverse/ireverse_" + shard + ".txt", (text) => {
+      const forms = []
+      const lines = text.split("\n")
+      for (let i = 0; i < lines.length; i++) {
+        const parts = lines[i].split("\t")
+        if (parts.length >= 2 && parts[0] === query) {
+          const words = parts[1].split(",")
+          for (let j = 0; j < words.length; j++) {
+            const w = words[j]
+            if (w && w !== query && !seen[w]) {
+              forms.push(w)
+            }
+          }
+          break
+        }
+      }
+      this.collectFormResults(query, forms, results, seen, 0, done)
+    })
+  },
+
+  collectFormResults(baseWord, forms, results, seen, index, done) {
+    if (index >= forms.length || results.length >= 20) {
+      done()
+      return
+    }
+
+    const form = forms[index]
+    const lower = this.normalizeWord(form)
+    if (!lower || seen[lower]) {
+      this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+      return
+    }
+    seen[lower] = true
+
+    // 先查词库，有则用词库释义；无则用词根释义
+    const first = lower.charAt(0)
+    if (first >= "a" && first <= "z") {
+      this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+        const candidates = []
+        this.collectCompactWordCandidates(text, form, candidates, seen, "变形", 1)
+        if (candidates.length > 0) {
+          this.hydrateCompactCandidates(candidates, results, 0, () => {
+            this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+          })
+        } else {
+          this.hydrateFromBaseWord(baseWord, form, results, () => {
+            this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+          })
+        }
+      })
+    } else {
+      this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+    }
+  },
+
+  hydrateFromBaseWord(baseWord, displayWord, results, done) {
+    const first = this.normalizeWord(baseWord).charAt(0)
+    if (first < "a" || first > "z") {
+      done()
+      return
+    }
+    this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+      const lines = text.split("\n")
+      for (let i = 0; i < lines.length; i++) {
+        const parts = lines[i].split("\t")
+        if (parts.length >= 3 && parts[0].toLowerCase() === baseWord.toLowerCase()) {
+          const entryId = this.parseEntryId(parts[1])
+          if (entryId >= 0) {
+            const shard = this.entryShardFor(entryId)
+            this.loadEntryShard(shard, (entries) => {
+              const item = entries[entryId]
+              if (item) {
+                results.push(
+                  this.createResultCard(
+                    this.normalizeWord(displayWord),
+                    displayWord,
+                    item.phonetic,
+                    item.translation,
+                    "变形"
+                  )
+                )
+              }
+              done()
+            })
+            return
+          }
+          break
+        }
+      }
+      done()
     })
   },
 
@@ -770,8 +888,24 @@ export default {
     return score
   },
 
+  highestTag(tag) {
+    if (!tag) return ""
+    const tags = tag.split(" ")
+    const priority = ["zk", "gk", "cet4", "cet6", "ky", "ielts", "toefl", "gre"]
+    let best = tags[0] || ""
+    let bestIdx = -1
+    for (let i = 0; i < tags.length; i++) {
+      const idx = priority.indexOf(tags[i])
+      if (idx > bestIdx) {
+        bestIdx = idx
+        best = tags[i]
+      }
+    }
+    return best
+  },
+
   createResultCard(id, word, phonetic, translation, tag) {
-    const maxW = (this.$app.$def.data.screenWidth || 212) - 44
+    const maxW = this.contentWidth
     const lines = this.wrapText(translation || "", maxW)
     const safeLines = lines.length > 0 ? lines : [""]
     const lineHeight = 22
@@ -784,7 +918,7 @@ export default {
       rawPhonetic: phonetic || "",
       translation: translation || "",
       translationLines: safeLines,
-      tag: tag,
+      tag: this.highestTag(tag),
       cardHeight: cardHeight,
       itemHeight: cardHeight + 10
     }
@@ -1152,17 +1286,15 @@ export default {
 }
 
 .result-list {
-  width: 190px;
   height: 388px;
   margin-bottom: 4px;
 }
 
 .result-item {
-  width: 190px;
+  /* width bound inline */
 }
 
 .result-card {
-  width: 190px;
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 12px;
@@ -1173,15 +1305,14 @@ export default {
 }
 
 .result-head {
-  width: 166px;
+  width: 100%;
   height: 38px;
   flex-direction: row;
-  justify-content: space-between;
   align-items: center;
 }
 
 .result-word {
-  width: 112px;
+  flex: 1;
   height: 38px;
   color: #ffffff;
   font-size: 28px;
@@ -1189,28 +1320,28 @@ export default {
 }
 
 .result-tag {
-  width: 50px;
+  flex-shrink: 0;
   height: 28px;
   color: #aeb0b4;
   font-size: 18px;
   font-weight: 700;
-  text-align: right;
+  margin-left: 8px;
 }
 
 .result-phonetic {
-  width: 166px;
+  width: 100%;
   height: 22px;
   color: #aeb0b4;
   font-size: 16px;
 }
 
 .translation-box {
-  width: 166px;
+  width: 100%;
   flex-direction: column;
 }
 
 .result-translation-line {
-  width: 166px;
+  width: 100%;
   height: 22px;
   color: #aeb0b4;
   font-size: 18px;
