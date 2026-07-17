@@ -60,7 +60,12 @@ export default {
   onInit() {
     const sw = this.$app.$def.data.screenWidth || 212
     this.screenWidth = sw
-    this.cardWidth = sw - 20
+    if (sw === 466) {
+      // 圆屏：卡片置于内切正方形内(安全区域)，避免圆角裁切
+      this.cardWidth = Math.round(sw / Math.SQRT2) // 330
+    } else {
+      this.cardWidth = sw - 20
+    }
     this.contentWidth = this.cardWidth - 24
     this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
     this.loadRecords()

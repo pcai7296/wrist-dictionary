@@ -4,7 +4,7 @@
       <text class="back-text">返回</text>
     </div>
 
-    <div class="word-area">
+    <div class="word-area" style="margin-left: {{wordAreaMarginLeft}}px;">
       <marquee if="{{ wordMarqueeOn }}" class="word-marquee" style="width: {{contentWidth}}px;"
         scrollamount="{{ wordMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
         {{ wordText }}   {{ wordText }}
@@ -88,7 +88,8 @@ export default {
     destroyed: false,
     wordMarqueeOn: false,
     wordMarqueeSpeed: 40,
-    wordMarqueeThreshold: 9
+    wordMarqueeThreshold: 9,
+    wordAreaMarginLeft: 15
   },
 
   _expandTag(s) {
@@ -133,6 +134,7 @@ export default {
     const sw = this.$app.$def.data.screenWidth || 212
     this.cardWidth = sw - 20
     this.contentWidth = this.cardWidth - 24
+    this.wordAreaMarginLeft = sw === 466 ? 45 : 15
     this.isRoundScreen = sw === 466
     this.isCapsule = sw === 192 || sw === 212
     if (this.isRoundScreen) {
@@ -566,7 +568,6 @@ export default {
 
 .word-area {
   margin-top: 14px;
-  margin-left: 15px;
   flex-direction: column;
   align-items: flex-start;
 }
