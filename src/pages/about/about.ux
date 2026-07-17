@@ -1,86 +1,60 @@
 <template>
   <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="back-pill" @click="goBack">
+    <div class="back-button" @click="goBack">
       <text class="back-mark">返回</text>
     </div>
 
-    <list class="about-list">
-      <list-item type="card" class="list-item" style="height: 250px;">
+    <list class="about-list" style="width: {{layoutWidth}}px;">
+      <list-item type="card" class="list-item" style="width: {{layoutWidth}}px; height: 250px;">
         <div class="app-card">
           <text class="app-name">腕上词典</text>
-          <text class="app-version">2.0</text>
+          <text class="app-version">2.1.0</text>
           <img class="deco-icon-about" src="/common/deco-icon-about.png" />
         </div>
       </list-item>
 
-      <list-item type="devs" class="list-item" style="height: 170px;">
-        <div class="section-inner">
-          <text class="section-title">Developers</text>
-          <text class="dev-role">开发</text>
-          <text class="dev-name">@睡不着的鸿鹄</text>
-          <text class="dev-role">UI设计参考</text>
-          <text class="dev-name">@无源流沙</text>
+      <list-item type="devs" class="list-item" style="width: {{layoutWidth}}px; height: 170px;">
+        <div class="section-inner" style="{{adaptiveSectionStyle}}">
+          <text class="section-title" style="{{sectionTitleStyle}}">Developers</text>
+          <text class="dev-role" style="{{devLineStyle}}">开发</text>
+          <text class="dev-name" style="{{devLineStyle}}">@睡不着的鸿鹄</text>
+          <text class="dev-role" style="{{devLineStyle}}">UI设计参考</text>
+          <text class="dev-name" style="{{devLineStyle}}">@无源流沙</text>
         </div>
       </list-item>
 
-      <list-item type="license" class="list-item" style="height: 110px;">
-        <div class="section-inner">
-          <text class="section-title">词库来源</text>
-          <text class="license-line">ECDICT (MIT)</text>
-          <text class="license-line">CC-CEDICT</text>
-          <text class="license-line">BNC/COCA 词族表</text>
+      <list-item type="license" class="list-item" style="width: {{layoutWidth}}px; height: {{licenseHeight}}px;">
+        <div class="section-inner" style="{{adaptiveSectionStyle}}">
+          <text class="section-title" style="{{sectionTitleStyle}}">词库来源</text>
+          <text class="license-line" style="{{descLineStyle}}" for="{{ line in licenseLines }}">{{ line }}</text>
         </div>
       </list-item>
 
-      <list-item type="usage" class="list-item" style="height: 520px;">
-        <div class="section-inner">
-          <text class="section-title">使用说明</text>
-          <text class="desc-line">1. 首页→"查找变形"</text>
-          <text class="desc-line" style="margin-top: 0px;">   输入词根查屈折变化</text>
-          <text class="desc-line">2. 首页→"中英查找"</text>
-          <text class="desc-line" style="margin-top: 0px;">   搜英文或中文得释义</text>
-          <text class="desc-line">3. 点击结果卡片看详细释义</text>
-          <text class="desc-line">4. 详情页可添加到收藏复习</text>
-          <text class="desc-line">5. 搜索历史存于"历史记录"</text>
+      <list-item type="usage" class="list-item" style="width: {{layoutWidth}}px; height: {{usageHeight}}px;">
+        <div class="section-inner" style="{{adaptiveSectionStyle}}">
+          <text class="section-title" style="{{sectionTitleStyle}}">使用说明</text>
+          <text class="desc-line" style="{{descLineStyle}}" for="{{ line in usageLines }}">{{ line }}</text>
         </div>
       </list-item>
 
-      <list-item type="limits" class="list-item" style="height: 340px;">
-        <div class="section-inner">
-          <text class="section-title">使用限制</text>
-          <text class="desc-line">• 约15,000词 + 12万中文词组，专有词可能未收录</text>
-          <text class="desc-line">• 每次搜索最多20条结果，模糊最多80候补</text>
-          <text class="desc-line">• 中文搜索需精确匹配，长句效果有限</text>
-          <text class="desc-line">• 中文搜索耗时较长，请稍候</text>
+      <list-item type="limits" class="list-item" style="width: {{layoutWidth}}px; height: {{limitsHeight}}px;">
+        <div class="section-inner" style="{{adaptiveSectionStyle}}">
+          <text class="section-title" style="{{sectionTitleStyle}}">使用限制</text>
+          <text class="desc-line" style="{{descLineStyle}}" for="{{ line in limitLines }}">{{ line }}</text>
         </div>
       </list-item>
 
-      <list-item type="tags" class="list-item" style="height: 320px;">
-        <div class="section-inner">
-          <text class="section-title">标签缩写</text>
-          <text class="desc-line">zk    中考词汇</text>
-          <text class="desc-line">gk    高考词汇</text>
-          <text class="desc-line">cet4  大学英语四级</text>
-          <text class="desc-line">cet6  大学英语六级</text>
-          <text class="desc-line">ky    考研词汇</text>
-          <text class="desc-line">toefl 托福</text>
-          <text class="desc-line">ielts 雅思</text>
-          <text class="desc-line">gre   GRE</text>
+      <list-item type="tags" class="list-item" style="width: {{layoutWidth}}px; height: {{tagsHeight}}px;">
+        <div class="section-inner" style="{{adaptiveSectionStyle}}">
+          <text class="section-title" style="{{sectionTitleStyle}}">标签缩写</text>
+          <text class="desc-line" style="{{descLineStyle}}" for="{{ line in tagLines }}">{{ line }}</text>
         </div>
       </list-item>
 
-      <list-item type="pos" class="list-item" style="height: 380px;">
-        <div class="section-inner">
-          <text class="section-title">词性对照</text>
-          <text class="desc-line">n.    名词</text>
-          <text class="desc-line">v.    动词 (vt.及物 / vi.不及物)</text>
-          <text class="desc-line">a.    形容词</text>
-          <text class="desc-line">adv.  副词</text>
-          <text class="desc-line">pron. 代词</text>
-          <text class="desc-line">prep. 介词</text>
-          <text class="desc-line">conj. 连词</text>
-          <text class="desc-line">interj. 感叹词</text>
-          <text class="desc-line">num.  数词</text>
+      <list-item type="pos" class="list-item" style="width: {{layoutWidth}}px; height: {{posHeight}}px;">
+        <div class="section-inner" style="{{adaptiveSectionStyle}}">
+          <text class="section-title" style="{{sectionTitleStyle}}">词性对照</text>
+          <text class="desc-line" style="{{descLineStyle}}" for="{{ line in posLines }}">{{ line }}</text>
         </div>
       </list-item>
     </list>
@@ -93,7 +67,173 @@ import router from "@system.router"
 export default {
   private: {
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    layoutWidth: 196,
+    textWidth: 180,
+    usageHeight: 520,
+    licenseHeight: 110,
+    limitsHeight: 340,
+    tagsHeight: 320,
+    posHeight: 380,
+    usageLines: [],
+    licenseLines: [],
+    limitLines: [],
+    tagLines: [],
+    posLines: [],
+    adaptiveSectionStyle: "width: 196px; align-items: center;",
+    sectionTitleStyle: "width: 180px; text-align: left;",
+    devLineStyle: "width: 180px; text-align: center;",
+    descLineStyle: "width: 180px; text-align: left;"
+  },
+
+  onInit() {
+    this.applyScreenLayout()
+  },
+
+  onShow() {
+    this.applyScreenLayout()
+  },
+
+  applyScreenLayout() {
+    const appData = this.$app.$def.data || {}
+    const sw = appData.screenWidth || 212
+    const profile = appData.screenProfile || "pill-standard"
+    const isPill = profile === "pill-standard" || profile === "pill-compact"
+    const safeWidth = sw === 466 ? Math.round(sw / Math.SQRT2) : sw - 20
+
+    if (isPill) {
+      this.layoutWidth = 196
+      this.textWidth = 180
+      this.adaptiveSectionStyle = "width: 196px; align-items: center;"
+      this.sectionTitleStyle = "width: 180px; text-align: left;"
+      this.devLineStyle = "width: 180px; text-align: center;"
+      this.descLineStyle = "width: 180px; text-align: left;"
+    } else {
+      this.layoutWidth = safeWidth
+      this.textWidth = Math.max(180, safeWidth - 16)
+      this.adaptiveSectionStyle = "width: " + safeWidth + "px; align-items: flex-start;"
+      this.sectionTitleStyle = "width: " + this.textWidth + "px; text-align: left;"
+      this.devLineStyle = "width: " + this.textWidth + "px; text-align: left;"
+      this.descLineStyle = "width: " + this.textWidth + "px; text-align: left;"
+    }
+
+    this.usageLines = this.wrapUsageText(this.textWidth)
+    this.licenseLines = this.wrapSectionLines([
+      "ECDICT（MIT）",
+      "CC-CEDICT",
+      "BNC/COCA 词族表"
+    ], this.textWidth)
+    this.limitLines = this.wrapSectionLines([
+      "• 约 1.5 万英文词、12.2 万中文词组",
+      "• 每次最多显示 20 条，模糊候选最多 80 条",
+      "• 中文支持词组和单字检索，长句可能缺失",
+      "• 数据完全离线，首次读取分片时请稍候"
+    ], this.textWidth)
+    this.tagLines = this.wrapSectionLines([
+      "zk  中考词汇",
+      "gk  高考词汇",
+      "cet4  大学英语四级",
+      "cet6  大学英语六级",
+      "ky  考研词汇",
+      "toefl  托福",
+      "ielts  雅思",
+      "gre  GRE"
+    ], this.textWidth)
+    this.posLines = this.wrapSectionLines([
+      "n.  名词",
+      "v.  动词：vt. 及物 / vi. 不及物",
+      "a.  形容词",
+      "adv.  副词",
+      "pron.  代词",
+      "prep.  介词",
+      "conj.  连词",
+      "interj.  感叹词",
+      "num.  数词"
+    ], this.textWidth)
+    this.usageHeight = this.sectionHeight(this.usageLines, 260)
+    this.licenseHeight = this.sectionHeight(this.licenseLines, 110)
+    this.limitsHeight = this.sectionHeight(this.limitLines, 260)
+    this.tagsHeight = this.sectionHeight(this.tagLines, 260)
+    this.posHeight = this.sectionHeight(this.posLines, 320)
+  },
+
+  wrapSectionLines(items, maxWidth) {
+    const lines = []
+    for (let i = 0; i < items.length; i++) {
+      const wrapped = this.wrapText(items[i], maxWidth)
+      for (let j = 0; j < wrapped.length; j++) {
+        lines.push(wrapped[j])
+      }
+    }
+    return lines
+  },
+
+  sectionHeight(lines, minimum) {
+    return Math.max(minimum, 58 + lines.length * 28)
+  },
+
+  wrapUsageText(maxWidth) {
+    const items = [
+      "1. 查变形：输入词根，查看词形变化",
+      "2. 中英查找：输入英文或中文，查看释义",
+      "3. 点结果卡片：打开完整释义",
+      "4. 详情页：收藏词条，稍后复习",
+      "5. 历史记录：查看最近搜索"
+    ]
+    const lines = []
+    for (let i = 0; i < items.length; i++) {
+      const wrapped = this.wrapText(items[i], maxWidth)
+      for (let j = 0; j < wrapped.length; j++) {
+        lines.push(wrapped[j])
+      }
+    }
+    return lines
+  },
+
+  wrapText(value, maxWidth) {
+    const text = (value || "").trim()
+    if (!text) {
+      return []
+    }
+
+    const lines = []
+    let line = ""
+    let width = 0
+    let lastBreak = -1
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charAt(i)
+      const chWidth = ch >= "A" && ch <= "z" ? 10 : 18
+      if (line && width + chWidth > maxWidth) {
+        if (lastBreak > 0) {
+          lines.push(line.slice(0, lastBreak).trim())
+          line = line.slice(lastBreak).trim()
+          width = this.measureTextWidth(line)
+        } else {
+          lines.push(line)
+          line = ""
+          width = 0
+        }
+        lastBreak = -1
+      }
+      line += ch
+      width += chWidth
+      if (ch === "：" || ch === "，" || ch === "、" || ch === "。") {
+        lastBreak = line.length
+      }
+    }
+    if (line) {
+      lines.push(line)
+    }
+    return lines
+  },
+
+  measureTextWidth(value) {
+    let width = 0
+    for (let i = 0; i < value.length; i++) {
+      const ch = value.charAt(i)
+      width += ch >= "A" && ch <= "z" ? 10 : 18
+    }
+    return width
   },
 
   goBack() {
@@ -145,20 +285,18 @@ export default {
 .page {
   width: 100%;
   height: 100%;
-  padding-top: 8px;
+  padding-top: 24px;
   background-color: #000000;
   flex-direction: column;
   align-items: center;
 }
 
-.back-pill {
+.back-button {
   width: 78px;
-  height: 72px;
-  margin-bottom: 10px;
-  border-radius: 36px;
-  border-width: 2px;
-  border-color: #2f8cff;
-  background-color: #08172b;
+  height: 54px;
+  margin-bottom: 12px;
+  border-radius: 22px;
+  background-color: #0b65ea;
   justify-content: center;
   align-items: center;
 }

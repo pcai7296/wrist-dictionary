@@ -8,7 +8,7 @@ Loaded by `opencode.json` (configuration: `instructions: ["AGENTS.md", ".opencod
 |------|-------|
 | `vela.md` | **MANDATORY** — must be read before any Vela work (.ux, manifest, build, deploy, API). Points to `skill(name="vela-dev")`. |
 | `poster-qc.md` | Standardized poster/cover-design iteration flow (GLM-4V-Flash visual QC loop). |
-| `conventions.md` | Project-level rules: min 18px font, no emulator touching without ask, about-page clipping fix recipe. |
+| `conventions.md` | Project-level rules: min 18px font, no emulator touching without ask, about-page multi-screen layout. |
 | `dictionary-coverage.md` | Dict coverage analysis + CC-CEDICT integration notes. |
 
 ## Roles
@@ -22,5 +22,5 @@ Loaded by `opencode.json` (configuration: `instructions: ["AGENTS.md", ".opencod
 |------|---------------|
 | Edit any `.ux`, `manifest.json`, debug Vela framework | `vela.md` |
 | Generate / iterate `release_repo/cover.png` | `poster-qc.md` |
-| Touch `src/pages/about/` text styling | `conventions.md` (text-clipping known issue) |
+| Touch `src/pages/about/` text styling | `conventions.md` (multi-screen width and wrapping rules) |
 | Diagnose Chinese dict coverage / word-family augmentation | `dictionary-coverage.md` |

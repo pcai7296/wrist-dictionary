@@ -16,32 +16,6 @@
 
 ## 已解决问题与处理建议
 
-### About 页面文字截断
+### About 页面多屏适配
 
-**现象**：使用说明/使用限制区域的文字被截断，显示不全。
-
-**根因**：
-1. `.desc-line` 样式设置了 `lines: 3`，限制了文本最大行数
-2. `<list-item>` 的 `style="height: Xpx"` 容器高度不足，内部内容被裁剪
-
-**修复方案**：
-1. 去掉 `lines: N` 限制（或设大），让文本自然换行
-2. 放大字号（如 14px → 16px）以提高可读性
-3. 增加 `<list-item>` 的 `height` 值，给文本留足空间
-4. 确保 `.desc-line` 使用 `height: auto` 自适应高度
-
-**涉及文件**：`src/pages/about/about.ux`
-
-**典型改法**：
-```diff
--.desc-line {
--  font-size: 14px;
--  lines: 3;
--}
-+.desc-line {
-+  font-size: 16px;
-+}
-
--<list-item type="usage" class="list-item" style="height: 290px;">
-+<list-item type="usage" class="list-item" style="height: 340px;">
-```
+关于页现在按 `screenProfile` 和结果页同源计算安全宽度：胶囊屏保持原有居中布局，矩形屏和 466×466 圆屏将开发者/使用说明内容左移到安全区，并按动态文本宽度换行。版本卡片保持原尺寸与位置；使用说明由页面运行时按宽度生成行。

@@ -11,7 +11,7 @@
 | File | What |
 |------|------|
 | opencode.json | Loads AGENTS.md + .opencode/instructions/vela.md + poster-qc.md |
-| .opencode/instructions/conventions.md | Font-size rules (min 18px), about page text clipping, emulator policy |
+| .opencode/instructions/conventions.md | Font-size rules (min 18px), about page multi-screen layout, emulator policy |
 | .opencode/instructions/dictionary-coverage.md | Dict coverage analysis + CC-CEDICT integration |
 | .opencode/instructions/poster-qc.md | Poster generation + GLM-4V-Flash visual QA workflow |
 | .prettierrc.js | No semicolons, double quotes, no trailing commas, racketSpacing: false, printWidth 100, 2-space indent. .ux parsed as Vue |
@@ -69,7 +69,7 @@ src/
     results/                      — English/Chinese results (985 lines)
     detail/                       — Word detail + favorite toggle (505 lines)
     records/                      — History / favorites list (type param)
-    about/                        — Credits, license (text clipping known issue)
+    about/                        — Credits, license, multi-screen adaptive usage text
     sponsor/                      — Donation QR code
   components/
     InputMethod/                  — English QWERTY keyboard (852 lines), sub-assets for layouts
@@ -89,7 +89,7 @@ release_repo/                     — Published RPK + cover.png + preview screen
 - Background #020813 on all pages except about (#000000)
 - Blue/white/black dark theme
 - **All text min 18px** — do not go below unless user OKs truncation
-- **Known issue**: about page text clipping at bottom (per conventions.md)
+- **About page**: usage text wraps by screen profile; 466×466 uses the same safe width as results.
 
 ## Storage
 
