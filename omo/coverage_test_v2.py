@@ -110,15 +110,26 @@ print(f"中文测试词: {len(NEW_CHINESE)} (去重后)")
 print("\n加载词库...")
 t0 = time.time()
 
+def decode_word_prefix(raw, prev_word):
+    """Decode 'prefixLen,suffix' format. '3,ing' + 'hunt' → 'hunting'."""
+    if "," in raw:
+        cnt_str, suffix = raw.split(",", 1)
+        cnt = int(cnt_str)
+        return prev_word[:cnt] + suffix
+    return raw
+
 en_word_set = set()
 for shard_file in sorted((DICT_DIR / "words").iterdir()):
     if not shard_file.name.startswith("word_"):
         continue
+    prev_word = ""
     with open(shard_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) == 3:
-                en_word_set.add(parts[0].lower().strip())
+                word = decode_word_prefix(parts[0], prev_word)
+                prev_word = word
+                en_word_set.add(word.lower().strip())
 
 # cn_index
 cn_index = {}
@@ -126,11 +137,18 @@ for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
     if not cn_file.name.startswith("cn_"):
         continue
     bucket_map = {}
+    prev_phrase = ""
     with open(cn_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) >= 2:
-                bucket_map[parts[0]] = parts[1].split(",")
+                phrase = parts[0]
+                if "," in phrase:
+                    p = phrase.split(",", 1)
+                    cnt = int(p[0])
+                    phrase = prev_phrase[:cnt] + (p[1] or "")
+                bucket_map[phrase] = parts[1].split(",")
+                prev_phrase = phrase
     cn_index[cn_file.stem.replace("cn_", "")] = bucket_map
 
 print(f"  英文词条: {len(en_word_set)}")
@@ -144,11 +162,15 @@ def search_english(word):
     # prefix match
     shard_file = DICT_DIR / "words" / f"word_{low[:1]}.txt"
     if shard_file.exists():
+        prev_word = ""
         with open(shard_file, "r", encoding="utf-8") as f:
             for line in f:
                 parts = line.strip().split("\t")
-                if len(parts) == 3 and parts[0].lower().startswith(low):
-                    return "prefix"
+                if len(parts) == 3:
+                    word_decoded = decode_word_prefix(parts[0], prev_word)
+                    prev_word = word_decoded
+                    if word_decoded.lower().startswith(low):
+                        return "prefix"
     return "miss"
 
 def zh_bucket(ch):

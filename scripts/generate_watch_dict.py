@@ -55,8 +55,110 @@ def key_for(value):
     return "".join(chars)
 
 
+TAG_TO_CODE = {
+    "zk": "z", "gk": "g", "cet4": "4", "cet6": "6",
+    "ky": "k", "toefl": "t", "ielts": "i", "gre": "e",
+}
+
+TAG_TO_BIT = {'z': 1, 'g': 2, '4': 4, '6': 8, 'k': 16, 'i': 32, 't': 64, 'e': 128}
+
+IPA_MAP = {
+    '\u0259': 'a',   # ə schwa
+    '\u04d9': 'a',   # ә cyrillic schwa (data variant)
+    '\u025a': 'r',   # ɚ rhotic schwa
+    '\u0454': 'e',   # є cyrillian ie
+    '\u03b5': 'e',   # ε greek epsilon
+    '\u026a': 'i',   # ɪ small cap i
+    '\u02c8': "'",   # ˈ primary stress
+    '\u02cc': ',',   # ˌ secondary stress
+    '\u0251': 'A',   # ɑ script a
+    '\u028a': 'U',   # ʊ
+    '\u0283': 'S',   # ʃ esh
+    '\u0292': 'Z',   # ʒ ezh
+    '\u03b8': 'T',   # θ theta
+    '\u00f0': 'D',   # ð eth
+    '\u014b': 'N',   # ŋ eng
+    '\u0254': 'O',   # ɔ open o
+    '\u00e6': 'E',   # æ ash
+    '\u025b': 'e',   # ɛ epsilon
+    '\u025c': 'R',   # ɜ reversed epsilon
+    '\u02d0': '|',   # ː length mark
+    '\u0252': 'Q',   # ɒ turned script a
+    '\u028c': 'V',   # ʌ turned v
+    '\u0261': 'g',   # ɡ script g
+}
+
+PHRASE_ENCODE = {
+    'vt. ': '!',
+    'vi. ': '$',
+    'n. ': '@',
+    'a. ': '#',
+    'ad. ': '%',
+    'adv. ': '%',
+    'prep. ': '^',
+    'conj. ': '&',
+    'pron. ': '*',
+    'int. ': '(',
+    'num. ': ')',
+    'art. ': '-',
+    'aux. ': '=',
+    '[计]': '{',
+    '[法]': '}',
+    '[医]': '|',
+    '[生]': '[',
+    '[化]': ']',
+    '[物]': '<',
+    '[经]': '>',
+}
+
+
+def compact_tag(value):
+    """Compress space-separated tags into comma-separated single-char codes.
+    'cet4 cet6 ky toefl ielts gre' -> '4,6,k,t,i,e'
+    """
+    if not value:
+        return value
+    codes = []
+    for tag in value.split():
+        code = TAG_TO_CODE.get(tag)
+        if code:
+            codes.append(code)
+    return ",".join(codes)
+
+
+def encode_tag_bitmap(value):
+    """Convert comma-separated tag codes to a hex bitmask.
+    'g,4,6,k,t,e' -> '5f'
+    Returns empty string if no tags.
+    """
+    if not value:
+        return ""
+    mask = 0
+    for code in value.split(","):
+        code = code.strip()
+        if code in TAG_TO_BIT:
+            mask |= TAG_TO_BIT[code]
+    return "" if mask == 0 else format(mask, 'x')
+
+
+def encode_phrase_dict(value):
+    """Replace common POS/domain markers with single-char codes."""
+    if not value:
+        return value
+    result = value
+    for pattern, code in sorted(PHRASE_ENCODE.items(), key=lambda x: -len(x[0])):
+        result = result.replace(pattern, code)
+    return result
+
+
 def normalize_chinese(value):
     return "".join(re.findall(r"[\u4e00-\u9fff]", value or ""))
+
+
+def write_txt(path, content):
+    """Write text file with LF line endings (not platform-native CRLF)."""
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content)
 
 
 # CC-CEDICT English stop words — words too generic to form useful zh→en mappings
@@ -152,6 +254,34 @@ def encode_delta_base36(entry_ids):
     if not tokens:
         raise DictionaryFormatError("entry ID list must not be empty")
     return ",".join(tokens)
+
+
+def encode_rle(tokens):
+    """Apply run-length encoding to a list of delta-base36 tokens.
+    
+    Consecutive identical tokens become 'value^count' (^ is not a valid base36 char).
+    Example: ['1','1','1','2','3','3'] → ['1^3','2','3^2']
+    """
+    if not tokens:
+        return ""
+    result = []
+    current = tokens[0]
+    count = 1
+    for t in tokens[1:]:
+        if t == current:
+            count += 1
+        else:
+            if count > 1:
+                result.append(f"{current}^{count}")
+            else:
+                result.append(current)
+            current = t
+            count = 1
+    if count > 1:
+        result.append(f"{current}^{count}")
+    else:
+        result.append(current)
+    return ",".join(result)
 
 
 def decode_delta_base36(value):
@@ -434,6 +564,7 @@ def main():
     word_indexes = {letter: [] for letter in "abcdefghijklmnopqrstuvwxyz"}
     inflect = {}
     reverse_inflect = {}
+
     entry_shards = {}
     zh_index = {}
     word_set = {row["word"].lower() for row in rows}
@@ -488,41 +619,54 @@ def main():
     for first_letter, indexed_rows in sorted(word_indexes.items()):
         indexed_rows.sort(key=lambda item: item[1]["word"].lower())
         lines = []
+        prev_word = ""
         for entry_id, row in indexed_rows:
-            lines.append("\t".join([row["word"], str(entry_id), row["tag"]]))
-        (OUT / "words" / f"word_{first_letter}.txt").write_text(
-            "\n".join(lines) + "\n", encoding="utf-8"
+            word = row["word"]
+            prefix_len = 0
+            limit = min(len(word), len(prev_word))
+            while prefix_len < limit and word[prefix_len] == prev_word[prefix_len]:
+                prefix_len += 1
+            lines.append(
+                "\t".join(
+                    [
+                        f"{prefix_len},{word[prefix_len:]}",
+                        to_base36(entry_id),
+                        encode_tag_bitmap(compact_tag(row["tag"])),
+                    ]
+                )
+            )
+            prev_word = word
+        write_txt(OUT / "words" / f"word_{first_letter}.txt", 
+            "\n".join(lines) + "\n"
         )
 
     for shard, forms in sorted(inflect.items()):
         lines = []
         for form, bases in sorted(forms.items()):
             lines.append(form + "\t" + ",".join(sorted(bases)))
-        (OUT / "inflect" / f"inflect_{shard}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        write_txt(OUT / "inflect" / f"inflect_{shard}.txt", "\n".join(lines) + "\n")
 
     for shard, bases in sorted(reverse_inflect.items()):
         lines = []
         for base, forms in sorted(bases.items()):
             lines.append(base + "\t" + ",".join(sorted(forms)))
-        (OUT / "inflect_reverse" / f"ireverse_{shard}.txt").write_text(
-            "\n".join(lines) + "\n", encoding="utf-8"
+        write_txt(OUT / "inflect_reverse" / f"ireverse_{shard}.txt",
+            "\n".join(lines) + "\n"
         )
 
     for shard, shard_rows in sorted(entry_shards.items()):
         lines = []
         for entry_id, row in shard_rows:
-            lines.append(
-                "\t".join(
-                    [
-                        str(entry_id),
-                        row["word"],
-                        row["phonetic"],
-                        row["translation"],
-                        row["tag"],
-                    ]
-                )
-            )
-        (OUT / "entries" / f"entry_{shard}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+            fields = [
+                row["word"],
+                "".join(IPA_MAP.get(c, c) for c in row["phonetic"]),
+                encode_phrase_dict(row["translation"]),
+            ]
+            tag_code = encode_tag_bitmap(compact_tag(row["tag"]))
+            if tag_code:
+                fields.append(tag_code)
+            lines.append("\t".join(fields))
+        write_txt(OUT / "entries" / f"entry_{shard}.txt", "\n".join(lines) + "\n")
 
     # Build cn_index: Chinese phrase → entry IDs (from ECDICT translations)
     cn_index = {}
@@ -575,28 +719,41 @@ def main():
     cn_link_count = 0
     for bucket in sorted(cn_index):
         lines = []
+        prev_phrase = ""
         for phrase in sorted(cn_index[bucket]):
+            prefix_len = 0
+            limit = min(len(phrase), len(prev_phrase))
+            while prefix_len < limit and phrase[prefix_len] == prev_phrase[prefix_len]:
+                prefix_len += 1
             ids = encode_delta_base36(sorted(cn_index[bucket][phrase]))
-            lines.append(f"{phrase}\t{ids}")
+            lines.append(f"{prefix_len},{phrase[prefix_len:]}\t{ids}")
             cn_phrase_count += 1
             cn_link_count += len(cn_index[bucket][phrase])
-        (OUT / "cn_index" / f"cn_{bucket}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+            prev_phrase = phrase
+        write_txt(OUT / "cn_index" / f"cn_{bucket}.txt", "\n".join(lines) + "\n")
 
     zh_char_count = 0
     zh_link_count = 0
+    zh_rle_savings = 0
     for bucket, chars in sorted(zh_index.items()):
         lines = []
         for char, entry_ids in sorted(chars.items()):
-            lines.append(char + "\t" + encode_delta_base36(sorted(entry_ids)))
+            encoded = encode_delta_base36(sorted(entry_ids))
+            rle_encoded = encode_rle(encoded.split(","))
+            savings = len(encoded) - len(rle_encoded)
+            zh_rle_savings += savings
+            lines.append(char + "\t" + rle_encoded)
             zh_char_count += 1
             zh_link_count += len(entry_ids)
-        (OUT / "zh_index" / f"zh_{bucket}.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        write_txt(OUT / "zh_index" / f"zh_{bucket}.txt", "\n".join(lines) + "\n")
 
     stats = {
         "source": str(SOURCE),
         "headwords": len(rows),
-        "schema": "compact-v1",
-        "wordIndexFormat": "word\\tentryId\\ttag",
+        "schema": "compact-v2",
+        "wordIndexFormat": "prefixLen,suffix\\tbase36EntryId\\ttagCode(hex)",
+        "entriesFormat": "word\\tpron\\tdef\\t[tagCode]",
+        "entriesEncoding": "implicit-eid, ipa-mapped, phrase-encoded",
         "wordIndexFiles": len(word_indexes),
         "wordIndexEntries": len(rows),
         "wordShards": len(word_indexes),
@@ -626,6 +783,11 @@ def main():
         "wordnetLinksAdded": wordnet_links_added,
         "entryShards": len(entry_shards),
         "entryShardSize": ENTRY_SHARD_SIZE,
+        "cnIndexFormat": "prefixLen,suffix\\tdelta-ids(base36)",
+        "inflectFormat": "formEid(base36)\\tbaseEids(base36)",
+        "reverseInflectFormat": "baseEid(base36)\\tformEids(base36)",
+        "zhIndexRLE": True,
+        "zhIndexRLESavingsBytes": zh_rle_savings,
         "zhBuckets": len(zh_index),
         "zhChars": zh_char_count,
         "zhIndexLinks": zh_link_count,
@@ -636,7 +798,7 @@ def main():
         "ccCedictMerged": ccedict_added,
         "resultLimit": 20,
     }
-    (OUT / "meta.json").write_text(json.dumps(stats, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_txt(OUT / "meta.json", json.dumps(stats, ensure_ascii=False, indent=2))
     print(json.dumps(stats, ensure_ascii=False))
 
 

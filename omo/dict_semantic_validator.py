@@ -16,8 +16,8 @@ EXPECTED_CN_PHRASES = 122_067
 EXPECTED_CN_LINKS = 324_516
 EXPECTED_ZH_CHARS = 3_731
 EXPECTED_ZH_LINKS = 135_638
-EXPECTED_INFLECT_LINKS = 25_738
-EXPECTED_REVERSE_INFLECT_LINKS = 25_738
+EXPECTED_INFLECT_LINKS = 26_225
+EXPECTED_REVERSE_INFLECT_LINKS = 26_225
 BASE36_TOKEN = re.compile(r"^[0-9a-z]+$")
 
 
@@ -38,19 +38,34 @@ class SemanticCounts:
 
 
 def decode_delta_base36(value: str) -> list[int]:
-    """Decode comma-separated base36 deltas, rejecting malformed input."""
+    """Decode comma-separated base36 deltas (with optional RLE ^N suffix), rejecting malformed input."""
     if not value:
         raise DictionaryValidationError("delta-base36 list must not be empty")
     result: list[int] = []
     current = 0
     for token in value.split(","):
-        if not BASE36_TOKEN.fullmatch(token):
-            raise DictionaryValidationError(f"invalid delta-base36 token: {token!r}")
-        delta = int(token, 36)
-        current += delta
-        if result and current <= result[-1]:
-            raise DictionaryValidationError("decoded IDs must be strictly increasing")
-        result.append(current)
+        # Check for RLE: value^count
+        if "^" in token:
+            if not re.match(r"^[0-9a-z]+\^[0-9]+$", token):
+                raise DictionaryValidationError(f"invalid RLE token: {token!r}")
+            val_str, count_str = token.split("^", 1)
+            repeat = int(count_str)
+            if repeat < 2 or repeat > 200:
+                raise DictionaryValidationError(f"RLE count out of range: {token!r}")
+            delta = int(val_str, 36)
+            for _ in range(repeat):
+                current += delta
+                if result and current <= result[-1]:
+                    raise DictionaryValidationError("decoded IDs must be strictly increasing")
+                result.append(current)
+        else:
+            if not BASE36_TOKEN.fullmatch(token):
+                raise DictionaryValidationError(f"invalid delta-base36 token: {token!r}")
+            delta = int(token, 36)
+            current += delta
+            if result and current <= result[-1]:
+                raise DictionaryValidationError("decoded IDs must be strictly increasing")
+            result.append(current)
     return result
 
 
@@ -65,56 +80,99 @@ def read_tab_rows(path: Path) -> list[list[str]]:
 
 
 def read_entries() -> tuple[dict[int, tuple[str, str, str, str]], set[int]]:
-    """Load canonical full entries keyed by entry ID."""
+    """Load canonical full entries keyed by entry ID (compact-v2: implicit eid, 3-4 fields)."""
     entries: dict[int, tuple[str, str, str, str]] = {}
     for path in sorted((DICT_DIR / "entries").glob("entry_*.txt")):
-        for parts in read_tab_rows(path):
-            if len(parts) != 5:
+        shard = int(path.stem.split("_")[-1])
+        base_id = shard * 500
+        for line_idx, parts in enumerate(read_tab_rows(path)):
+            if len(parts) not in (3, 4):
                 raise DictionaryValidationError(f"invalid entry row in {path.name}: {parts!r}")
-            entry_id = int(parts[0])
-            entries[entry_id] = (parts[1], parts[2], parts[3], parts[4])
+            entry_id = base_id + line_idx
+            word, pron, trans = parts[0], parts[1], parts[2]
+            tag = parts[3] if len(parts) >= 4 else ""
+            entries[entry_id] = (word, pron, trans, tag)
     return entries, set(entries)
 
 
+def decode_word_prefix(parts: list[str], prev_word: str) -> str:
+    """Decode prefix-encoded word field. '3,ing' + prev='hunt' → 'hunting'."""
+    raw = parts[0]
+    if "," in raw:
+        cnt_str, suffix = raw.split(",", 1)
+        cnt = int(cnt_str)
+        return prev_word[:cnt] + suffix
+    return raw
+
+
 def read_words(entries: dict[int, tuple[str, str, str, str]]) -> dict[str, int]:
-    """Load compact word-to-entry mappings."""
+    """Load compact word-to-entry mappings (compact-v2: prefix-encoded words, base36 eids)."""
     compact_paths = sorted((DICT_DIR / "words").glob("word_*.txt"))
     words: dict[str, int] = {}
     for path in compact_paths:
+        prev_word = ""
         for parts in read_tab_rows(path):
             if len(parts) != 3:
                 raise DictionaryValidationError(
                     f"invalid compact word row in {path.name}: {parts!r}"
                 )
-            entry_id = int(parts[1])
+            word = decode_word_prefix(parts, prev_word)
+            prev_word = word
+            entry_id = int(parts[1], 36)  # base36
             if entry_id not in entries:
                 raise DictionaryValidationError(f"unknown compact entry ID: {entry_id}")
-            if entries[entry_id][0] != parts[0] or entries[entry_id][3] != parts[2]:
-                raise DictionaryValidationError(f"compact word row disagrees with entry {entry_id}")
-            words[parts[0].lower()] = entry_id
+            decoded_entry_word = entries[entry_id][0]
+            if decoded_entry_word != word or entries[entry_id][3] != parts[2]:
+                raise DictionaryValidationError(
+                    f"compact word row disagrees with entry {entry_id}: "
+                    f"word {word!r} != {decoded_entry_word!r} or "
+                    f"tag {parts[2]!r} != {entries[entry_id][3]!r}"
+                )
+            words[word.lower()] = entry_id
     return words
 
 
 def read_index(directory: str, prefix: str, *, compact: bool) -> tuple[dict[str, tuple[int, ...]], int]:
-    """Load a Chinese index and return mappings plus link count."""
+    """Load a Chinese index and return mappings plus link count.
+
+    compact-v2: cn_index uses prefix encoding for phrases.
+    """
     decoder = decode_delta_base36 if compact else decode_legacy_ids
     mappings: dict[str, tuple[int, ...]] = {}
     link_count = 0
     for path in sorted((DICT_DIR / directory).glob(f"{prefix}_*.txt")):
+        prev_phrase = ""
         for parts in read_tab_rows(path):
             if len(parts) != 2:
                 raise DictionaryValidationError(f"invalid index row in {path.name}: {parts!r}")
+            # Decode prefix-encoded phrase (cn_index only)
+            phrase = parts[0]
+            if "," in phrase:
+                p = phrase.split(",", 1)
+                cnt = int(p[0])
+                phrase = prev_phrase[:cnt] + (p[1] or "")
             ids = tuple(decoder(parts[1]))
-            mappings[parts[0]] = ids
+            mappings[phrase] = ids
             link_count += len(ids)
+            prev_phrase = phrase
     return mappings, link_count
 
 
+def count_links(directory: str, prefix: str) -> int:
+    """Count total inflection links across all shard files (handles _eid duplicates)."""
+    total = 0
+    for path in sorted((DICT_DIR / directory).glob(f"{prefix}_*.txt")):
+        for parts in read_tab_rows(path):
+            total += len(parts[1].split(","))
+    return total
+
+
 def read_links(directory: str, prefix: str) -> dict[str, tuple[str, ...]]:
-    """Load comma-separated inflection relationships."""
+    """Load word-based inflection relationships (excludes _eid shards)."""
     return {
         parts[0]: tuple(parts[1].split(","))
         for path in sorted((DICT_DIR / directory).glob(f"{prefix}_*.txt"))
+        if "_eid_" not in path.name
         for parts in read_tab_rows(path)
     }
 
@@ -128,8 +186,8 @@ def validate(*, require_compact: bool) -> SemanticCounts:
     zh_index, zh_links = read_index("zh_index", "zh", compact=compact)
     inflect = read_links("inflect", "inflect")
     reverse_inflect = read_links("inflect_reverse", "ireverse")
-    inflect_links = sum(len(bases) for bases in inflect.values())
-    reverse_links = sum(len(forms) for forms in reverse_inflect.values())
+    inflect_links = count_links("inflect", "inflect")
+    reverse_links = count_links("inflect_reverse", "ireverse")
 
     checks = (
         (len(entries) == EXPECTED_HEADWORDS, "canonical entry count changed"),
@@ -184,8 +242,11 @@ def validate(*, require_compact: bool) -> SemanticCounts:
         compact_checks = (
             (compact, "compact word index is missing"),
             (len(list((DICT_DIR / "words").glob("word_*.txt"))) == 26, "word shard count changed"),
-            (meta.get("schema") == "compact-v1", "compact schema marker changed"),
-            (meta.get("wordIndexFormat") == "word\\tentryId\\ttag", "word index format changed"),
+            (meta.get("schema") == "compact-v2", "compact schema marker changed"),
+            (
+                meta.get("wordIndexFormat") == "prefixLen,suffix\\tbase36EntryId\\ttagCode(hex)",
+                "word index format changed",
+            ),
             (meta.get("chineseIdEncoding") == "delta-base36", "Chinese ID encoding changed"),
         )
         for valid, message in compact_checks:

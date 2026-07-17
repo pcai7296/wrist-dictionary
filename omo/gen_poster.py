@@ -20,11 +20,51 @@ DEEP = (0, 55, 150)
 
 SKIN_SCREEN = (31, 166, 242, 683)
 
+REDMI_SKIN = r'C:\Users\Administrator\.vela\sdk\skins\builtin\redmi_watch\background.png'
+REDMI_SCREEN = (47, 182, 432, 514)  # (x, y, w, h) in the 560×870 skin
+REDMI_CR = 80
+
 def load_font(path, size):
     try:
         return ImageFont.truetype(path, size)
     except:
         return ImageFont.load_default()
+
+
+def wrap_text(draw, text, font, max_width):
+    """Break text into lines fitting max_width. Prefers breaks at spaces/punctuation."""
+    if draw.textbbox((0, 0), text, font=font)[2] <= max_width:
+        return [text]
+
+    lines = []
+    remaining = text
+    while remaining:
+        w = draw.textbbox((0, 0), remaining, font=font)[2]
+        if w <= max_width:
+            lines.append(remaining)
+            break
+
+        # Binary search: longest prefix that fits
+        lo, hi = 1, len(remaining)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if draw.textbbox((0, 0), remaining[:mid], font=font)[2] <= max_width:
+                lo = mid
+            else:
+                hi = mid - 1
+
+        # Walk backward to find natural break point (space / punctuation)
+        cut = lo
+        for i in range(lo, max(lo - 12, 1) - 1, -1):
+            if remaining[i - 1] in ' ，、；：. ':
+                cut = i
+                break
+
+        lines.append(remaining[:cut])
+        remaining = remaining[cut:].lstrip()
+
+    return lines
+
 
 def create_cover():
     canvas = Image.new('RGB', (W, H))
@@ -84,15 +124,15 @@ def create_cover():
     canvas.paste(skin_resized, (int(W * 0.05), (H - skin_h) // 2), skin_resized)
 
     # ===== RIGHT SIDE — dynamic spacing based on measured text =====
-    tx0 = int(W * 0.34)
+    tx0 = int(W * 0.5)
 
     ft_title = load_font(FONT_BOLD, 210)
-    ft_sub = load_font(FONT_BOLD, 95)   # 95px: width~1040 < 1188 available — safe from truncation
-    ft_feat = load_font(FONT_BOLD, 90)
-    ft_desc = load_font(FONT_REG, 60)
+    ft_sub = load_font(FONT_BOLD, 80)   # 80px: fits within right-half (900px) after moving tx0 to center
+    ft_feat = load_font(FONT_BOLD, 80)
+    ft_desc = load_font(FONT_REG, 52)
 
     # Title
-    title_y = 35
+    title_y = 20
     for s in range(8, 0, -1):
         a = max(8, 40 - s * 5)
         draw.text((tx0 + s * 4, title_y + s * 4),
@@ -104,7 +144,7 @@ def create_cover():
     title_bottom = title_y + title_h
 
     # Subtitle — measured to ensure width fits within canvas
-    sub_y = title_bottom + 55
+    sub_y = title_bottom + 40
     sub_text = '离线英汉词典 | 抬手即查'
     draw.text((tx0, sub_y), sub_text, fill=(220, 238, 255), font=ft_sub)
 
@@ -114,7 +154,7 @@ def create_cover():
     avail_w = W - tx0
     if sub_w > avail_w:
         print(f'  WARNING: subtitle width {sub_w}px exceeds available {avail_w}px — truncation risk!')
-    print(f'  Subtitle: ft=95px, w={sub_w}px, h={sub_h}px, avail={avail_w}px')
+    print(f'  Subtitle: ft=80px, w={sub_w}px, h={sub_h}px, avail={avail_w}px')
 
     # Feature items — rewritten from actual app features
     features = [
@@ -124,24 +164,25 @@ def create_cover():
         ('收藏历史', '生词一键收藏，搜索自动记录'),
     ]
 
-    feat_y = sub_y + sub_h + 40
+    feat_y = sub_y + sub_h + 25
 
     for f_title, f_desc in features:
-        # Measure this feature's actual title height
         ftb = draw.textbbox((0, 0), f_title, font=ft_feat)
         f_title_h = ftb[3] - ftb[1]
 
-        fdb = draw.textbbox((0, 0), f_desc, font=ft_desc)
-        f_desc_h = fdb[3] - fdb[1]
-
-        # Desc starts AFTER the title ends (not inside it)
-        desc_y = feat_y + f_title_h + 4
+        # Wrap description to available width
+        desc_lines = wrap_text(draw, f_desc, ft_desc, avail_w)
 
         draw.text((tx0, feat_y), f_title, fill=WHITE, font=ft_feat)
-        draw.text((tx0, desc_y), f_desc, fill=(200, 225, 250), font=ft_desc)
 
-        # Line height = title + 4px gap + desc + 12px inter-feature padding
-        feat_y += f_title_h + 4 + f_desc_h + 12
+        desc_y = feat_y + f_title_h + 4
+        for dl in desc_lines:
+            draw.text((tx0, desc_y), dl, fill=(200, 225, 250), font=ft_desc)
+            desc_y += ft_desc.size + 6
+
+        n_lines = len(desc_lines)
+        total_desc_h = n_lines * ft_desc.size + (n_lines - 1) * 4
+        feat_y += f_title_h + 3 + total_desc_h + 10
 
     feat_end = feat_y
     print(f'  Features range: {sub_y + sub_h + 40} to {feat_end} ({feat_end - (sub_y + sub_h + 40)}px)')
@@ -150,10 +191,52 @@ def create_cover():
     if H - feat_end < 30:
         print('  WARNING: very tight bottom margin!')
 
+    # ===== REDMI WATCH (top layer, skin + screenshot, bottom-aligned with band) =====
+    REDMI_SHOT = os.path.join(BASE, 'review', '5_home.png')
+    redmi_bg = Image.open(REDMI_SKIN).convert('RGBA')
+
+    # Scale skin: height matches band (912px) so bottom-align is natural
+    r_scale = skin_h / redmi_bg.height  # use same height as Mi Band 10
+    r_w = int(redmi_bg.width * r_scale)
+    r_h = skin_h
+
+    # Bottom-align with Mi Band 10
+    band_bottom = (H - skin_h) // 2 + skin_h  # 1056
+    r_x = 280
+    r_y = band_bottom - r_h
+
+    redmi_resized = redmi_bg.resize((r_w, r_h), Image.LANCZOS)
+
+    # Paste screenshot onto screen area (scaled to match)
+    r_sx = int(REDMI_SCREEN[0] * r_scale)
+    r_sy = int(REDMI_SCREEN[1] * r_scale)
+    r_sw = int(REDMI_SCREEN[2] * r_scale)
+    r_sh = int(REDMI_SCREEN[3] * r_scale)
+    redmi_shot = Image.open(REDMI_SHOT).convert('RGBA')
+    redmi_shot_scaled = redmi_shot.resize((r_sw, r_sh), Image.LANCZOS)
+
+    # Rounded-corner mask
+    screen_mask = Image.new('L', (r_sw, r_sh), 0)
+    sm_draw = ImageDraw.Draw(screen_mask)
+    r_cr = int(REDMI_CR * r_scale)
+    sm_draw.rounded_rectangle([(0, 0), (r_sw, r_sh)], radius=r_cr, fill=255)
+    redmi_resized.paste(redmi_shot_scaled, (r_sx, r_sy), screen_mask)
+
+    # Shadow
+    r_shadow = Image.new('RGBA', (r_w + 40, r_h + 40), (0, 0, 0, 0))
+    rs_draw = ImageDraw.Draw(r_shadow)
+    for s in range(15, 0, -1):
+        rs_draw.rounded_rectangle([s, s, r_w + 40 - s, r_h + 40 - s],
+                                  radius=20, fill=(0, 0, 0, 2 + s * 2))
+    canvas.paste(r_shadow, (r_x - 20, r_y - 20), r_shadow)
+    canvas.paste(redmi_resized, (r_x, r_y), redmi_resized)
+
+    print(f'  Redmi Watch: at ({r_x},{r_y}), scaled {r_w}x{r_h}, bottom={r_y + r_h}')
+
     canvas.save(OUT)
     print(f'[OK] Poster v9: {OUT}')
     print(f'  Title: ft=210px, rendered_h={title_h}px ({title_h/H*100:.1f}%)')
-    print(f'  Subtitle: ft=95px')
+    print(f'  Subtitle: ft=80px')
 
 if __name__ == '__main__':
     create_cover()

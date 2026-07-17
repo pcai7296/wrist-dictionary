@@ -199,8 +199,8 @@ class SemanticValidatorRegressionTest(unittest.TestCase):
                 "cn_links": 324_516,
                 "zh_chars": 3_731,
                 "zh_links": 135_638,
-                "inflect": 25_738,
-                "reverse": 25_738,
+                "inflect": 26_225,
+                "reverse": 26_225,
             },
         )
 

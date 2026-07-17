@@ -1,7 +1,7 @@
 <template>
   <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="back-pill" @click="goBack">
-      <text class="back-mark">返回</text>
+    <div class="back-button" @click="goBack">
+      <text class="back-text">返回</text>
     </div>
 
     <list class="record-list" if="{{ recordItems.length > 0 }}" style="width: {{cardWidth}}px;">
@@ -412,20 +412,18 @@ export default {
   align-items: center;
 }
 
-.back-pill {
+.back-button {
   width: 78px;
-  height: 72px;
+  height: 54px;
   margin-bottom: 8px;
-  border-radius: 36px;
-  border-width: 2px;
-  border-color: #333333;
-  background-color: #242424;
+  border-radius: 22px;
+  background-color: #0b65ea;
   justify-content: center;
   align-items: center;
 }
 
-.back-mark {
-  width: 64px;
+.back-text {
+  width: 70px;
   height: 30px;
   color: #ffffff;
   font-size: 22px;

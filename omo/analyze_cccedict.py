@@ -50,15 +50,26 @@ print(f"Parsed entries (2+ Chinese chars): {len(parsed)}")
 
 # ── 2. Load existing dictionary word set ──
 print("\nLoading existing dictionary...")
+def decode_word_prefix(raw, prev_word):
+    """Decode 'prefixLen,suffix' format. '3,ing' + 'hunt' → 'hunting'."""
+    if "," in raw:
+        cnt_str, suffix = raw.split(",", 1)
+        cnt = int(cnt_str)
+        return prev_word[:cnt] + suffix
+    return raw
+
 en_word_set = set()
 for shard_file in sorted((DICT_DIR / "words").iterdir()):
     if not shard_file.name.startswith("word_"):
         continue
+    prev_word = ""
     with open(shard_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) == 3:
-                en_word_set.add(parts[0].lower().strip())
+                word = decode_word_prefix(parts[0], prev_word)
+                prev_word = word
+                en_word_set.add(word.lower().strip())
 
 print(f"Existing English words: {len(en_word_set)}")
 

@@ -63,6 +63,9 @@ const ENGLISH_SUFFIXES = [
   "ity"
 ]
 
+var TAG_CODE_MAP = {z: 'zk', g: 'gk', '4': 'cet4', '6': 'cet6', k: 'ky', t: 'toefl', i: 'ielts', e: 'gre'}
+var TAG_LABELS = ['zk', 'gk', 'cet4', 'cet6', 'ky', 'ielts', 'toefl', 'gre']
+
 export default {
   protected: {
     queryParam: "",
@@ -90,14 +93,58 @@ export default {
     destroyed: false,
     autoSearchPending: false,
     englishSuggestionCache: null,
+    englishSuggestionParsed: null,
     englishSuggestionPending: null,
     englishSuggestionToken: 0,
+    _suggestionTimer: null,
     marqueeActive: false,
     marqueeSpeed: 40
   },
 
+  _expandTag(s) {
+    if (!s) return ''
+    s = s.replace(/\r/g, '')
+    if (s.indexOf(',') < 0 && /^[0-9a-f]+$/.test(s)) {
+      var mask = parseInt(s, 16)
+      var labels = []
+      for (var bit = 0; bit < TAG_LABELS.length; bit++) {
+        if (mask & (1 << bit)) {
+          labels.push(TAG_LABELS[bit])
+        }
+      }
+      return labels.join(' ')
+    }
+    return s.split(',').map(function(c) { return TAG_CODE_MAP[c] || c }).filter(Boolean).join(' ')
+  },
+
+  _decodeWordPrefix(parts, prevWord) {
+    var word = parts[0]
+    if (word.indexOf(",") >= 0) {
+      var p = word.split(",")
+      var cnt = parseInt(p[0], 10)
+      word = prevWord.slice(0, cnt) + (p[1] || "")
+    }
+    return word
+  },
+
+  _parseSuggestionLines(text) {
+    var rows = text.split("\n")
+    var out = []
+    var prevWord = ""
+    for (var i = 0; i < rows.length; i++) {
+      var parts = rows[i].split("\t")
+      if (parts.length >= 3) {
+        var word = this._decodeWordPrefix(parts, prevWord)
+        prevWord = word
+        out.push({word: word, entryId: parts[1], tags: parts[2] || ''})
+      }
+    }
+    return out
+  },
+
   onInit() {
     this.englishSuggestionCache = {}
+    this.englishSuggestionParsed = {}
     this.englishSuggestionPending = {}
     const app = this.$app.$def
     this.applyScreenInfo(app.data)
@@ -164,6 +211,12 @@ export default {
     }
   },
 
+  onBackPress() {
+    // Disable system swipe-back gesture — it conflicts with keyboard right-swipes
+    // Manual swipe-back via onTouchStart/onTouchEnd handles back navigation
+    return true
+  },
+
   toggleKeyboard() {
     this.keyboardHidden = !this.keyboardHidden
     this.refreshDisplay()
@@ -186,6 +239,7 @@ export default {
       this.cursorIndex--
     }
     this.refreshDisplay()
+    this.scheduleSuggestionUpdate()
   },
 
   onComplete(evt) {
@@ -196,12 +250,14 @@ export default {
       this.cursorIndex += content.length
     }
     this.refreshDisplay()
+    this.scheduleSuggestionUpdate()
   },
 
   clearText() {
     this.query = ""
     this.cursorIndex = 0
     this.refreshDisplay()
+    this.scheduleSuggestionUpdate()
   },
 
   moveLeft() {
@@ -356,11 +412,14 @@ export default {
     const endY = point.clientY
     const appData = (this.$app && this.$app.$def && this.$app.$def.data) || {}
     const sw = appData.screenWidth || 212
+    const sh = appData.screenHeight || 520
     const startsInLeftQuarter = this.touchStartX <= sw * 0.25
     const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
+    // Keyboard visible → only trigger from above the keyboard (top ~35%)
+    const validStartZone = this.keyboardHidden || this.touchStartY <= sh * 0.35
 
-    if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
+    if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal && validStartZone) {
       router.back()
     }
 
@@ -435,14 +494,9 @@ export default {
   },
 
   updateEnglishSeed() {
-    const text = this.query.slice(0, this.cursorIndex).toLowerCase()
-    const match = text.match(/[a-z][a-z'-]*$/)
-    const nextSeed = match && match[0] ? match[0] : ""
-    if (nextSeed === this.englishSeed) {
-      return
-    }
-    this.englishSeed = nextSeed
-    this.refreshEnglishSuggestions(nextSeed)
+    var text = this.query.slice(0, this.cursorIndex).toLowerCase()
+    var match = text.match(/[a-z][a-z'-]*$/)
+    this.englishSeed = match && match[0] ? match[0] : ""
   },
 
   refreshEnglishSuggestions(seed) {
@@ -463,9 +517,38 @@ export default {
     })
   },
 
+  scheduleSuggestionUpdate() {
+    if (this._suggestionTimer) {
+      clearTimeout(this._suggestionTimer)
+    }
+    // Empty seed — clear suggestions immediately
+    if (!this.englishSeed) {
+      this.englishSuggestionToken++
+      this.englishSuggestionsText = ""
+      setSuggestionSeed("")
+      setSuggestions("")
+      return
+    }
+    var self = this
+    this._suggestionTimer = setTimeout(function () {
+      self._suggestionTimer = null
+      self.refreshEnglishSuggestions(self.englishSeed)
+    }, 200)
+  },
+
   loadEnglishSuggestionSource(letter, done) {
+    // Cache hit — use pre-parsed rows
+    if (Object.prototype.hasOwnProperty.call(this.englishSuggestionParsed, letter)) {
+      done(this.englishSuggestionParsed[letter])
+      return
+    }
+    // Migrate from old text cache if present
     if (Object.prototype.hasOwnProperty.call(this.englishSuggestionCache, letter)) {
-      done(this.englishSuggestionCache[letter])
+      var _rows = this.englishSuggestionCache[letter] || ""
+      var _parsed = _rows ? this._parseSuggestionLines(_rows) : []
+      this.englishSuggestionParsed[letter] = _parsed
+      delete this.englishSuggestionCache[letter]
+      done(_parsed)
       return
     }
     if (this.englishSuggestionPending[letter]) {
@@ -482,50 +565,54 @@ export default {
         if (this.destroyed) {
           return
         }
-        const text = data && data.text ? data.text : ""
-        this.englishSuggestionCache[letter] = text
-        const pending = this.englishSuggestionPending[letter]
+        var text = data && data.text ? data.text : ""
+        var parsed = text ? this._parseSuggestionLines(text) : []
+        this.englishSuggestionParsed[letter] = parsed
+        var pending = this.englishSuggestionPending[letter]
         delete this.englishSuggestionPending[letter]
-        pending(text)
+        pending(parsed)
       },
       fail: () => {
         if (this.destroyed) {
           return
         }
-        this.englishSuggestionCache[letter] = ""
-        const pending = this.englishSuggestionPending[letter]
+        this.englishSuggestionParsed[letter] = []
+        var pending = this.englishSuggestionPending[letter]
         delete this.englishSuggestionPending[letter]
-        pending("")
+        pending([])
       }
     })
   },
 
-  applyEnglishSuggestions(normalized, source) {
-    const rows = source ? source.split("\n") : []
-    const items = []
-    const seen = {}
+  applyEnglishSuggestions(normalized, rows) {
+    var items = []
+    var seen = {}
     this.scanEnglishSuggestionRows(rows, normalized, items, seen)
-    const suggestions = this.buildEnglishSuggestions(normalized, items, seen).join("|")
+    var suggestions = this.buildEnglishSuggestions(normalized, items, seen).join("|")
     this.englishSuggestionsText = suggestions
     setSuggestionSeed(normalized)
     setSuggestions(suggestions)
   },
 
   scanEnglishSuggestionRows(rows, seed, items, seen) {
-    for (let i = 0; i < rows.length; i++) {
-      const parts = rows[i].split("\t")
-      if (parts.length < 3 || !/^(0|[1-9]\d*)$/.test(parts[1])) {
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i]
+      if (!row || !row.entryId || !/^[0-9a-z]+$/.test(row.entryId)) {
         continue
       }
-      const word = this.normalizeEnglishSeed(parts[0])
+      var word = this.normalizeEnglishSeed(row.word)
       if (!word || word === seed || seen[word] || word.indexOf(seed) !== 0) {
         continue
       }
       seen[word] = true
       items.push({
         word: word,
-        score: this.scoreEnglishCandidate(seed, word, parts[2] || "")
+        score: this.scoreEnglishCandidate(seed, word, this._expandTag(row.tags || ""))
       })
+      // Early termination — enough candidates for scoring to pick the best 30
+      if (items.length >= 80) {
+        break
+      }
     }
   },
 

@@ -405,7 +405,7 @@ export default {
     waitingIndex: -1,
     lastWaitingStr: "",
     downFlag: "",
-    lang: "cn",
+    lang: "en",
     numFlag: false,
     numFlag_jp: false,
     upperFlag: false,

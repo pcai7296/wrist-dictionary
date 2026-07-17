@@ -5,7 +5,11 @@
     </div>
 
     <div class="word-area">
-      <text class="word-text" style="width: {{contentWidth}}px;">{{ wordText }}</text>
+      <marquee if="{{ wordMarqueeOn }}" class="word-marquee" style="width: {{contentWidth}}px;"
+        scrollamount="{{ wordMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+        {{ wordText }}   {{ wordText }}
+      </marquee>
+      <text if="{{ !wordMarqueeOn }}" class="word-text" style="width: {{contentWidth}}px;">{{ wordText }}</text>
       <text class="phonetic-text" style="width: {{contentWidth}}px;">{{ phoneticText }}</text>
     </div>
 
@@ -29,6 +33,27 @@ import router from "@system.router"
 import storage from "@system.storage"
 import file from "@system.file"
 import prompt from "@system.prompt"
+
+var TAG_CODE_MAP = {z: 'zk', g: 'gk', '4': 'cet4', '6': 'cet6', k: 'ky', t: 'toefl', i: 'ielts', e: 'gre'}
+var TAG_LABELS = ['zk', 'gk', 'cet4', 'cet6', 'ky', 'ielts', 'toefl', 'gre']
+
+var IPA_DECODE_MAP = {
+  'a': '\u0259', 'r': '\u025a', 'e': '\u025b',
+  'i': '\u026a', "'": '\u02c8', ',': '\u02cc',
+  'A': '\u0251', 'U': '\u028a', 'S': '\u0283',
+  'Z': '\u0292', 'T': '\u03b8', 'D': '\u00f0',
+  'N': '\u014b', 'O': '\u0254', 'E': '\u00e6',
+  'R': '\u025c', '|': '\u02d0', 'Q': '\u0252',
+  'V': '\u028c', 'g': '\u0261'
+}
+
+var PHRASE_DECODE_MAP = {
+  '!': 'vt. ', '$': 'vi. ', '@': 'n. ', '#': 'a. ',
+  '%': 'ad. ', '^': 'prep. ', '&': 'conj. ', '*': 'pron. ',
+  '(': 'int. ', ')': 'num. ', '-': 'art. ', '=': 'aux. ',
+  '{': '[计]', '}': '[法]', '|': '[医]', '[': '[生]',
+  ']': '[化]', '<': '[物]', '>': '[经]'
+}
 
 export default {
   protected: {
@@ -60,7 +85,48 @@ export default {
     maxInflectDepth: 3,
     touchStartX: -1,
     touchStartY: -1,
-    destroyed: false
+    destroyed: false,
+    wordMarqueeOn: false,
+    wordMarqueeSpeed: 40,
+    wordMarqueeThreshold: 9
+  },
+
+  _expandTag(s) {
+    if (!s) return ''
+    s = s.replace(/\r/g, '')
+    if (s.indexOf(',') < 0 && /^[0-9a-f]+$/.test(s)) {
+      var mask = parseInt(s, 16)
+      var labels = []
+      for (var bit = 0; bit < TAG_LABELS.length; bit++) {
+        if (mask & (1 << bit)) {
+          labels.push(TAG_LABELS[bit])
+        }
+      }
+      return labels.join(' ')
+    }
+    return s.split(',').map(function(c) { return TAG_CODE_MAP[c] || c }).filter(Boolean).join(' ')
+  },
+
+  _decodeIpa(s) {
+    if (!s) return s
+    s = s.replace(/\r/g, '')
+    var out = ''
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i)
+      out += IPA_DECODE_MAP[ch] || ch
+    }
+    return out
+  },
+
+  _decodePhrase(s) {
+    if (!s) return s
+    s = s.replace(/\r/g, '')
+    var out = ''
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i)
+      out += PHRASE_DECODE_MAP[ch] || ch
+    }
+    return out
   },
 
   onInit() {
@@ -83,9 +149,11 @@ export default {
       this.favoriteBtnStyle = ""
     }
     this.wordText = this.word || ""
-    this.phoneticText = this.phonetic ? "/" + this.phonetic + "/" : ""
-    this.translationText = this.translation || ""
-    this.tagText = this.tag || ""
+    this.phoneticText = this.phonetic ? "/" + (this.phonetic || "") + "/" : ""
+    this.translationText = this._decodePhrase(this.translation || "")
+    this.tagText = this._expandTag(this.tag || "")
+    this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
+    this.applyWordMarquee(this.wordText)
     const tagLines = this.tagText ? this.tagText.split(" ") : []
     const wrapW = this.contentWidth - 24
     this.translationLines = this.wrapText(this.translationText, wrapW)
@@ -108,6 +176,26 @@ export default {
 
   goBack() {
     router.back()
+  },
+
+  resolveWordMarqueeThreshold(sw) {
+    if (sw === 192) return 8
+    if (sw === 212) return 9
+    if (sw === 336) return 16
+    if (sw === 432) return 20
+    if (sw === 466) return 20
+    return 9
+  },
+
+  applyWordMarquee(text) {
+    if (text && text.length > this.wordMarqueeThreshold) {
+      this.wordMarqueeOn = true
+      const extra = text.length - this.wordMarqueeThreshold
+      this.wordMarqueeSpeed = Math.max(40, Math.min(60, Math.round(40 + extra * 1.5)))
+    } else {
+      this.wordMarqueeOn = false
+      this.wordMarqueeSpeed = 40
+    }
   },
 
   goInflect() {
@@ -483,12 +571,18 @@ export default {
   align-items: flex-start;
 }
 
-.word-text {
+.word-text,
+.word-marquee {
   height: 40px;
   color: #ffffff;
   font-size: 32px;
   font-weight: 800;
   text-align: left;
+}
+
+.word-marquee {
+  lines: 1;
+  text-overflow: clip;
 }
 
 .phonetic-text {

@@ -20,6 +20,14 @@ print("=" * 60)
 print("加载词库数据...")
 t0 = time.time()
 
+def decode_word_prefix(raw, prev_word):
+    """Decode 'prefixLen,suffix' format. '3,ing' + 'hunt' → 'hunting'."""
+    if "," in raw:
+        cnt_str, suffix = raw.split(",", 1)
+        cnt = int(cnt_str)
+        return prev_word[:cnt] + suffix
+    return raw
+
 # 加载 26 个首字母英文索引 → word set
 en_word_set = set()
 en_word_map = {}  # word -> (phonetic, translation, tag)
@@ -28,26 +36,43 @@ for shard_file in sorted((DICT_DIR / "words").iterdir()):
     if not shard_file.name.startswith("word_"):
         continue
     shard_count += 1
+    prev_word = ""
     with open(shard_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) == 3:
-                word = parts[0].lower()
-                en_word_set.add(word)
-                en_word_map[word] = ("", "", parts[2])
+                word = decode_word_prefix(parts[0], prev_word)
+                prev_word = word
+                word_lower = word.lower()
+                en_word_set.add(word_lower)
+                en_word_map[word_lower] = ("", "", parts[2])
 
 
 def decode_delta_base36(value):
-    """解码递增 entryId 的 base36 差值列表。"""
+    """解码递增 entryId 的 base36 差值列表（支持 RLE ^N 后缀）。"""
     result = []
     current = 0
     for token in value.split(","):
-        if not token or not re.fullmatch(r"[0-9a-z]+", token):
-            raise DictionaryFormatError(f"非法 delta-base36 token: {token!r}")
-        current += int(token, 36)
-        if result and current <= result[-1]:
-            raise DictionaryFormatError("entryId 必须严格递增")
-        result.append(current)
+        if "^" in token:
+            if not re.match(r"^[0-9a-z]+\^[0-9]+$", token):
+                raise DictionaryFormatError(f"非法 RLE token: {token!r}")
+            val_str, count_str = token.split("^", 1)
+            repeat = int(count_str)
+            if repeat < 2 or repeat > 200:
+                raise DictionaryFormatError(f"RLE count 超出范围: {token!r}")
+            delta = int(val_str, 36)
+            for _ in range(repeat):
+                current += delta
+                if result and current <= result[-1]:
+                    raise DictionaryFormatError("entryId 必须严格递增")
+                result.append(current)
+        else:
+            if not token or not re.fullmatch(r"[0-9a-z]+", token):
+                raise DictionaryFormatError(f"非法 delta-base36 token: {token!r}")
+            current += int(token, 36)
+            if result and current <= result[-1]:
+                raise DictionaryFormatError("entryId 必须严格递增")
+            result.append(current)
     return result
 
 # 加载 cn_index
@@ -59,14 +84,21 @@ for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
         continue
     cn_bucket_count += 1
     bucket_map = {}
+    prev_phrase = ""
     with open(cn_file, "r", encoding="utf-8") as f:
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) >= 2:
                 phrase = parts[0]
+                # Decode prefix-encoded phrase
+                if "," in phrase:
+                    p = phrase.split(",", 1)
+                    cnt = int(p[0])
+                    phrase = prev_phrase[:cnt] + (p[1] or "")
                 entry_ids = decode_delta_base36(parts[1])
                 bucket_map[phrase] = entry_ids
                 cn_phrase_total += 1
+                prev_phrase = phrase
     cn_index[cn_file.stem.replace("cn_", "")] = bucket_map
 
 t1 = time.time()
@@ -151,11 +183,15 @@ def search_english(word):
     first_char = low[0] if low else ""
     shard_file = DICT_DIR / "words" / f"word_{first_char}.txt"
     if shard_file.exists():
+        prev_word = ""
         with open(shard_file, "r", encoding="utf-8") as f:
             for line in f:
                 parts = line.strip().split("\t")
-                if len(parts) == 3 and parts[0].lower().startswith(low):
-                    return ("prefix", ("", "", parts[2]))
+                if len(parts) == 3:
+                    word_decoded = decode_word_prefix(parts[0], prev_word)
+                    prev_word = word_decoded
+                    if word_decoded.lower().startswith(low):
+                        return ("prefix", ("", "", parts[2]))
     
     return ("miss", None)
 
@@ -316,10 +352,10 @@ print("─" * 60)
 print("  词库概况:")
 print(f"    总英文词条数:        {len(en_word_set)}")
 print(f"    中文索引词组数:     {cn_phrase_total}")
-print(f"    中考标签(zk):        {sum(1 for w in en_word_map if 'zk' in en_word_map[w][2])}")
-print(f"    高考标签(gk):        {sum(1 for w in en_word_map if 'gk' in en_word_map[w][2])}")
-print(f"    四级标签(cet4):      {sum(1 for w in en_word_map if 'cet4' in en_word_map[w][2])}")
-print(f"    六级标签(cet6):      {sum(1 for w in en_word_map if 'cet6' in en_word_map[w][2])}")
+print(f"    中考标签(zk):        {sum(1 for w in en_word_map if en_word_map[w][2] and int(en_word_map[w][2], 16) & (1 << 0))}")
+print(f"    高考标签(gk):        {sum(1 for w in en_word_map if en_word_map[w][2] and int(en_word_map[w][2], 16) & (1 << 1))}")
+print(f"    四级标签(cet4):      {sum(1 for w in en_word_map if en_word_map[w][2] and int(en_word_map[w][2], 16) & (1 << 2))}")
+print(f"    六级标签(cet6):      {sum(1 for w in en_word_map if en_word_map[w][2] and int(en_word_map[w][2], 16) & (1 << 3))}")
 print()
 
 # 命中词展示

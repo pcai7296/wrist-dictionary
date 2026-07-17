@@ -80,6 +80,25 @@ class LRUCache {
   }
 }
 
+var TAG_CODE_MAP = {z: 'zk', g: 'gk', '4': 'cet4', '6': 'cet6', k: 'ky', t: 'toefl', i: 'ielts', e: 'gre'}
+var TAG_LABELS = ['zk', 'gk', 'cet4', 'cet6', 'ky', 'ielts', 'toefl', 'gre']
+var IPA_DECODE_MAP = {
+  'a': '\u0259', 'r': '\u025a', 'e': '\u025b',
+  'i': '\u026a', "'": '\u02c8', ',': '\u02cc',
+  'A': '\u0251', 'U': '\u028a', 'S': '\u0283',
+  'Z': '\u0292', 'T': '\u03b8', 'D': '\u00f0',
+  'N': '\u014b', 'O': '\u0254', 'E': '\u00e6',
+  'R': '\u025c', '|': '\u02d0', 'Q': '\u0252',
+  'V': '\u028c', 'g': '\u0261'
+}
+var PHRASE_DECODE_MAP = {
+  '!': 'vt. ', '$': 'vi. ', '@': 'n. ', '#': 'a. ',
+  '%': 'ad. ', '^': 'prep. ', '&': 'conj. ', '*': 'pron. ',
+  '(': 'int. ', ')': 'num. ', '-': 'art. ', '=': 'aux. ',
+  '{': '[计]', '}': '[法]', '|': '[医]', '[': '[生]',
+  ']': '[化]', '<': '[物]', '>': '[经]'
+}
+
 export default {
   protected: {
     query: "",
@@ -111,10 +130,52 @@ export default {
     marqueeArmed: false
   },
 
+  _expandTag(s) {
+    if (!s) return ''
+    s = s.replace(/\r/g, '')
+    if (s.indexOf(',') < 0 && /^[0-9a-f]+$/.test(s)) {
+      var mask = parseInt(s, 16)
+      var labels = []
+      for (var bit = 0; bit < TAG_LABELS.length; bit++) {
+        if (mask & (1 << bit)) {
+          labels.push(TAG_LABELS[bit])
+        }
+      }
+      return labels.join(' ')
+    }
+    return s.split(',').map(function(c) { return TAG_CODE_MAP[c] || c }).filter(Boolean).join(' ')
+  },
+
+  _decodeIpa(s) {
+    if (!s) return s
+    s = s.replace(/\r/g, '')
+    var out = ''
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i)
+      out += IPA_DECODE_MAP[ch] || ch
+    }
+    return out
+  },
+
+  _decodePhrase(s) {
+    if (!s) return s
+    s = s.replace(/\r/g, '')
+    var out = ''
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i)
+      out += PHRASE_DECODE_MAP[ch] || ch
+    }
+    return out
+  },
+
   onInit() {
     this.fileCache = new LRUCache(5)
     this.entryCache = new LRUCache(3)
     this.cnIndexCache = new LRUCache(10)
+    // Force-reset result state — Vela may reuse page instance without re-init
+    this.resultCards = []
+    this.statusText = ""
+    this.searchToken++
     const sw = this.$app.$def.data.screenWidth || 212
     this.screenWidth = sw
     this.cardWidth = sw - 20
@@ -126,6 +187,16 @@ export default {
   },
 
   onShow() {
+    // Re-check query — Vela may reuse page instance without re-firing onInit
+    const currentQuery = this.normalizeWord(this.query)
+    if (currentQuery && currentQuery !== this.queryText) {
+      this.resultCards = []
+      this.statusText = ""
+      this.searchToken++
+      this.queryText = currentQuery
+      this.applyQueryMarquee(currentQuery)
+      this.performSearch()
+    }
     // 1.5s 让人先看清单词，再齐步启动所有跑马灯
     setTimeout(() => {
       this.marqueeArmed = true
@@ -243,7 +314,7 @@ export default {
   },
 
   finishEnglishSearch(query, token, results) {
-    if (results.length === 0 && this.searchMode !== "inflect" && this.isEnglishWord(query)) {
+    if (results.length === 0 && query.length > 2 && this.searchMode !== "inflect" && this.isEnglishWord(query)) {
       this.showToast("未找到，混淆搜索")
       this.statusText = "深度搜索"
       this.collectFuzzyResults(query, (cards) => {
@@ -372,11 +443,19 @@ export default {
 
     this.readText("/common/dict/cn_index/cn_" + bucket + ".txt", (text) => {
       const indexMap = {}
+      var prevPhrase = ""
       const lines = text.split("\n")
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2) {
-          indexMap[parts[0]] = this.decodeDeltaIds(parts[1])
+          var phrase = parts[0]
+          if (phrase.indexOf(",") >= 0) {
+            var p = phrase.split(",")
+            var cnt = parseInt(p[0], 10)
+            phrase = prevPhrase.slice(0, cnt) + (p[1] || "")
+          }
+          indexMap[phrase] = this.decodeDeltaIds(parts[1])
+          prevPhrase = phrase
         }
       }
       this.cnIndexCache.set(bucket, indexMap)
@@ -474,15 +553,18 @@ export default {
 
     this.readText("/common/dict/entries/entry_" + shard + ".txt", (text) => {
       const entries = {}
+      const baseId = parseInt(shard, 10) * 500
       const lines = text.split("\n")
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
-        if (parts.length >= 4) {
-          entries[parts[0]] = {
-            word: parts[1],
-            phonetic: parts[2],
-            translation: parts[3],
-            tag: parts[4] || ""
+        if (parts.length >= 3) {
+          var entryId = baseId + i
+          var tag = this._expandTag(parts[3] || "")
+          entries[entryId] = {
+            word: parts[0],
+            phonetic: parts[1] || "",
+            translation: parts[2] || "",
+            tag: tag
           }
         }
       }
@@ -627,10 +709,17 @@ export default {
       return
     }
     this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+      var prevWord = ""
       const lines = text.split("\n")
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
-        if (parts.length >= 3 && parts[0].toLowerCase() === baseWord.toLowerCase()) {
+        if (parts.length < 3) {
+          prevWord = ""
+          continue
+        }
+        var word = this._decodeWordPrefix(parts, prevWord)
+        prevWord = word
+        if (word.toLowerCase() === baseWord.toLowerCase()) {
           const entryId = this.parseEntryId(parts[1])
           if (entryId >= 0) {
             const shard = this.entryShardFor(entryId)
@@ -680,11 +769,22 @@ export default {
     })
   },
 
+  _decodeWordPrefix(parts, prevWord) {
+    var word = parts[0]
+    if (word.indexOf(",") >= 0) {
+      var p = word.split(",")
+      var cnt = parseInt(p[0], 10)
+      word = prevWord.slice(0, cnt) + (p[1] || "")
+    }
+    return word
+  },
+
   collectCompactWordCandidates(text, query, candidates, seen, source, limit) {
     if (!text || limit <= 0) {
       return
     }
     const normalizedQuery = this.normalizeWord(query)
+    var prevWord = ""
     const lines = text.split("\n")
     for (let i = 0; i < lines.length && candidates.length < limit; i++) {
       const parts = lines[i].split("\t")
@@ -692,7 +792,8 @@ export default {
         continue
       }
 
-      const word = parts[0]
+      const word = this._decodeWordPrefix(parts, prevWord)
+      prevWord = word
       const lower = this.normalizeWord(word)
       if (!lower || seen[lower]) {
         continue
@@ -714,7 +815,7 @@ export default {
         entryId: entryId,
         lower: lower,
         word: word,
-        tag: parts[2] || "",
+        tag: this._expandTag(parts[2] || ""),
         source: source
       })
     }
@@ -743,7 +844,7 @@ export default {
               item.word || next.word,
               item.phonetic,
               item.translation,
-              next.source || item.tag || next.tag
+              item.tag || next.tag || next.source
             )
           )
         }
@@ -754,6 +855,10 @@ export default {
   },
 
   collectFuzzyResults(query, done) {
+    if (query.length <= 2) {
+      done([])
+      return
+    }
     const shards = this.getFuzzyShards(query)
     const items = []
     const seen = {}
@@ -828,6 +933,7 @@ export default {
     if (!text) {
       return
     }
+    var prevWord = ""
     const lines = text.split("\n")
     for (
       let i = 0;
@@ -841,7 +947,9 @@ export default {
       if (parts.length < 3) {
         continue
       }
-      const lower = this.normalizeWord(parts[0])
+      const word = this._decodeWordPrefix(parts, prevWord)
+      prevWord = word
+      const lower = this.normalizeWord(word)
       if (!lower || seen[lower] || Math.abs(lower.length - query.length) > 2) {
         continue
       }
@@ -853,14 +961,15 @@ export default {
       if (entryId < 0) {
         continue
       }
+      var tagStr = this._expandTag(parts[2] || "")
       seen[lower] = true
       items.push({
         entryId: entryId,
         lower: lower,
-        word: parts[0],
-        tag: parts[2] || "",
+        word: word,
+        tag: tagStr,
         distance: distance,
-        score: this.scoreFuzzyCandidate(query, lower, parts[2] || "")
+        score: this.scoreFuzzyCandidate(query, lower, tagStr)
       })
     }
   },
@@ -955,6 +1064,11 @@ export default {
   },
 
   createResultCard(id, word, phonetic, translation, tag) {
+    // Decode phrase markers for display (IPA is stored as ASCII-safe encoding, used as-is)
+    phonetic = phonetic || ""
+    translation = this._decodePhrase(translation || "")
+    // Ensure tag is expanded — defense against raw hex bitmask reaching display layer
+    tag = this._expandTag(tag || "")
     const maxW = this.contentWidth
     const lines = this.wrapText(translation || "", maxW)
     const safeLines = lines.length > 0 ? lines : [""]
@@ -1200,33 +1314,70 @@ export default {
     const tokens = normalized.split(",")
     const ids = []
     let currentId = 0
+    let firstToken = true
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i]
-      if (!token || !/^[0-9a-z]+$/.test(token)) {
+      if (!token) {
         return []
       }
 
-      let delta = 0
-      for (let j = 0; j < token.length; j++) {
-        const ch = token.charAt(j)
-        const code = ch.charCodeAt(0)
-        const digit = code >= 48 && code <= 57 ? code - 48 : code - 87
-        if (digit < 0 || digit >= 36 || delta > Math.floor((MAX_SAFE_ENTRY_ID - digit) / 36)) {
+      // Check for RLE: value^count (^ is not a valid base36 char)
+      var delta = 0
+      var repeat = 1
+      const caretIdx = token.indexOf("^")
+      if (caretIdx >= 0) {
+        const valStr = token.slice(0, caretIdx)
+        const countStr = token.slice(caretIdx + 1)
+        if (!valStr || !countStr || !/^[0-9a-z]+$/.test(valStr) || !/^[1-9][0-9]*$/.test(countStr)) {
           return []
         }
-        delta = delta * 36 + digit
+        repeat = parseInt(countStr, 10)
+        if (repeat < 2 || repeat > 200) {
+          return []
+        }
+        delta = this._parseBase36(valStr)
+        if (delta < 0) {
+          return []
+        }
+      } else {
+        if (!/^[0-9a-z]+$/.test(token)) {
+          return []
+        }
+        delta = this._parseBase36(token)
+        if (delta < 0) {
+          return []
+        }
       }
 
-      if (i > 0 && delta === 0) {
+      // Only first token may have zero delta
+      if (!firstToken && delta === 0) {
         return []
       }
-      if (currentId > MAX_SAFE_ENTRY_ID - delta) {
-        return []
+      firstToken = false
+
+      for (let r = 0; r < repeat; r++) {
+        if (currentId > MAX_SAFE_ENTRY_ID - delta) {
+          return []
+        }
+        currentId += delta
+        ids.push(currentId)
       }
-      currentId += delta
-      ids.push(currentId)
     }
     return ids
+  },
+
+  _parseBase36(str) {
+    let result = 0
+    for (let j = 0; j < str.length; j++) {
+      const ch = str.charAt(j)
+      const code = ch.charCodeAt(0)
+      const digit = code >= 48 && code <= 57 ? code - 48 : code - 87
+      if (digit < 0 || digit >= 36 || result > Math.floor((MAX_SAFE_ENTRY_ID - digit) / 36)) {
+        return -1
+      }
+      result = result * 36 + digit
+    }
+    return result
   },
 
   parseEntryId(value) {
@@ -1236,10 +1387,11 @@ export default {
       }
       return value
     }
-    if (typeof value !== "string" || !/^[0-9]+$/.test(value)) {
+    if (typeof value !== "string" || !/^[0-9a-z]+$/.test(value)) {
       return -1
     }
-    const id = parseInt(value, 10)
+    // ALWAYS base36 — word files encode entryId as to_base36(entry_id) in generate_watch_dict.py
+    const id = parseInt(value, 36)
     if (id < 0 || id > MAX_SAFE_ENTRY_ID || Math.floor(id) !== id) {
       return -1
     }
