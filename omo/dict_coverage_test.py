@@ -10,6 +10,8 @@ from pathlib import Path
 # ── 配置 ──
 ROOT = Path(__file__).resolve().parents[1]
 DICT_DIR = ROOT / "src" / "common" / "dict"
+sys.path.insert(0, str(ROOT))
+from scripts.generate_watch_dict import decode_delta_ids as decode_v3_ids, decode_front_code
 
 
 class DictionaryFormatError(ValueError):
@@ -21,12 +23,8 @@ print("加载词库数据...")
 t0 = time.time()
 
 def decode_word_prefix(raw, prev_word):
-    """Decode 'prefixLen,suffix' format. '3,ing' + 'hunt' → 'hunting'."""
-    if "," in raw:
-        cnt_str, suffix = raw.split(",", 1)
-        cnt = int(cnt_str)
-        return prev_word[:cnt] + suffix
-    return raw
+    """Decode compact-v3 one-character Base36 front-coded words."""
+    return decode_front_code(raw, prev_word)
 
 # 加载 26 个首字母英文索引 → word set
 en_word_set = set()
@@ -49,31 +47,11 @@ for shard_file in sorted((DICT_DIR / "words").iterdir()):
 
 
 def decode_delta_base36(value):
-    """解码递增 entryId 的 base36 差值列表（支持 RLE ^N 后缀）。"""
-    result = []
-    current = 0
-    for token in value.split(","):
-        if "^" in token:
-            if not re.match(r"^[0-9a-z]+\^[0-9]+$", token):
-                raise DictionaryFormatError(f"非法 RLE token: {token!r}")
-            val_str, count_str = token.split("^", 1)
-            repeat = int(count_str)
-            if repeat < 2 or repeat > 200:
-                raise DictionaryFormatError(f"RLE count 超出范围: {token!r}")
-            delta = int(val_str, 36)
-            for _ in range(repeat):
-                current += delta
-                if result and current <= result[-1]:
-                    raise DictionaryFormatError("entryId 必须严格递增")
-                result.append(current)
-        else:
-            if not token or not re.fullmatch(r"[0-9a-z]+", token):
-                raise DictionaryFormatError(f"非法 delta-base36 token: {token!r}")
-            current += int(token, 36)
-            if result and current <= result[-1]:
-                raise DictionaryFormatError("entryId 必须严格递增")
-            result.append(current)
-    return result
+    """解码 compact-v3 Base64-ULEB128 递增 entryId 列表。"""
+    try:
+        return decode_v3_ids(value)
+    except ValueError as exc:
+        raise DictionaryFormatError(str(exc)) from exc
 
 # 加载 cn_index
 cn_index = {}
@@ -89,12 +67,7 @@ for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) >= 2:
-                phrase = parts[0]
-                # Decode prefix-encoded phrase
-                if "," in phrase:
-                    p = phrase.split(",", 1)
-                    cnt = int(p[0])
-                    phrase = prev_phrase[:cnt] + (p[1] or "")
+                phrase = decode_front_code(parts[0], prev_phrase)
                 entry_ids = decode_delta_base36(parts[1])
                 bucket_map[phrase] = entry_ids
                 cn_phrase_total += 1
@@ -197,8 +170,8 @@ def search_english(word):
 
 
 def chinese_bucket_for(ch):
-    """与 results.ux zhBucketFor 一致"""
-    return f"{ord(ch) % 64:02x}"
+    """与 results.ux cnBucketFor 一致"""
+    return f"{ord(ch) % 96:02x}"
 
 
 def get_first_chinese_char(text):
@@ -416,8 +389,8 @@ if cn_phrase_total != 122_067:
     count_regressions.append(f"Chinese phrases={cn_phrase_total} expected=122067")
 if shard_count != 26:
     count_regressions.append(f"word shards={shard_count} expected=26")
-if cn_bucket_count != 64:
-    count_regressions.append(f"Chinese buckets={cn_bucket_count} expected=64")
+if cn_bucket_count != 96:
+    count_regressions.append(f"Chinese buckets={cn_bucket_count} expected=96")
 
 if en_miss or cn_miss or count_regressions:
     details = "; ".join(count_regressions) if count_regressions else "corpus sample miss"

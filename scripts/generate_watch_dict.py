@@ -1,5 +1,6 @@
 # noqa: SIZE_OK - existing generator is intentionally a single deterministic pipeline.
 import csv
+import base64
 import gzip
 import json
 import os
@@ -21,6 +22,7 @@ WORDNET_FILES = {"n": "data.noun", "v": "data.verb", "a": "data.adj", "r": "data
 WORDNET_VALID_POS = {"n", "v", "a", "r"}
 OUT = ROOT / "src" / "common" / "dict"
 ENTRY_SHARD_SIZE = 500
+CN_BUCKET_COUNT = 96
 ZH_BUCKET_COUNT = 64
 XLSX_NS = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 BASE36_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -225,6 +227,10 @@ def zh_bucket_for(char):
     return f"{ord(char) % ZH_BUCKET_COUNT:02x}"
 
 
+def cn_bucket_for(char):
+    return f"{ord(char) % CN_BUCKET_COUNT:02x}"
+
+
 def entry_shard_for(entry_id):
     return f"{entry_id // ENTRY_SHARD_SIZE:02d}"
 
@@ -241,19 +247,31 @@ def to_base36(value):
     return "".join(reversed(digits))
 
 
-def encode_delta_base36(entry_ids):
+def encode_uleb128(value):
+    if value < 0:
+        raise DictionaryFormatError("ULEB128 value must be non-negative")
+    encoded = bytearray()
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        encoded.append(byte | (0x80 if value else 0))
+        if not value:
+            return bytes(encoded)
+
+
+def encode_delta_ids(entry_ids):
     previous = 0
-    tokens = []
+    encoded = bytearray()
     for position, entry_id in enumerate(entry_ids):
         if entry_id < 0:
             raise DictionaryFormatError("entry IDs must be non-negative")
         if position and entry_id <= previous:
             raise DictionaryFormatError("entry IDs must be strictly increasing")
-        tokens.append(to_base36(entry_id - previous))
+        encoded.extend(encode_uleb128(entry_id - previous))
         previous = entry_id
-    if not tokens:
+    if not encoded:
         raise DictionaryFormatError("entry ID list must not be empty")
-    return ",".join(tokens)
+    return base64.urlsafe_b64encode(bytes(encoded)).decode("ascii").rstrip("=")
 
 
 def encode_rle(tokens):
@@ -284,19 +302,64 @@ def encode_rle(tokens):
     return ",".join(result)
 
 
-def decode_delta_base36(value):
-    if not value:
-        raise DictionaryFormatError("delta-base36 list must not be empty")
+def encode_front_code(value, previous):
+    prefix_len = 0
+    limit = min(len(value), len(previous))
+    while prefix_len < limit and value[prefix_len] == previous[prefix_len]:
+        prefix_len += 1
+    if prefix_len >= 36:
+        raise DictionaryFormatError("front-code prefix exceeds one Base36 character")
+    return BASE36_DIGITS[prefix_len] + value[prefix_len:]
+
+
+def decode_front_code(value, previous):
+    if not value or value[0] not in BASE36_DIGITS:
+        raise DictionaryFormatError(f"invalid front-coded field: {value!r}")
+    prefix_len = int(value[0], 36)
+    if prefix_len > len(previous):
+        raise DictionaryFormatError("front-code prefix exceeds previous value")
+    return previous[:prefix_len] + value[1:]
+
+
+def decode_delta_ids(value):
+    if not value or not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        raise DictionaryFormatError("invalid Base64 ID list")
+    try:
+        raw = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise DictionaryFormatError("invalid Base64 ID list") from exc
+    if not raw:
+        raise DictionaryFormatError("Base64 ID list must not be empty")
     result = []
     current = 0
-    for token in value.split(","):
-        if not BASE36_TOKEN.fullmatch(token):
-            raise DictionaryFormatError(f"invalid delta-base36 token: {token!r}")
-        current += int(token, 36)
+    delta = 0
+    shift = 0
+    for byte in raw:
+        payload = byte & 0x7F
+        if shift >= 64 or (shift == 63 and payload > 1):
+            raise DictionaryFormatError("ULEB128 value exceeds 64 bits")
+        delta |= payload << shift
+        if byte & 0x80:
+            shift += 7
+            if shift >= 64:
+                raise DictionaryFormatError("ULEB128 value exceeds 64 bits")
+            continue
+        current += delta
         if result and current <= result[-1]:
             raise DictionaryFormatError("decoded IDs must be strictly increasing")
         result.append(current)
+        delta = 0
+        shift = 0
+    if shift != 0:
+        raise DictionaryFormatError("truncated ULEB128 value")
     return result
+
+
+# Compatibility names for existing offline callers; compact-v3 is the wire format.
+encode_delta_base64 = encode_delta_ids
+encode_delta_base36 = encode_delta_ids
+decode_delta_base36 = decode_delta_ids
+decode_delta_base64 = decode_delta_ids
 
 
 def parse_exchange(exchange):
@@ -568,6 +631,7 @@ def main():
     entry_shards = {}
     zh_index = {}
     word_set = {row["word"].lower() for row in rows}
+    word_to_entry = {row["word"].lower(): entry_id for entry_id, row in enumerate(rows)}
     exchange_links = 0
     word_family_links_added = 0
 
@@ -576,8 +640,8 @@ def main():
         base = normalize_family_word(base)
         if not form or not base or form == base:
             return False
-        form_key = key_for(form)
-        rev_key = key_for(base)
+        form_key = form[0]
+        rev_key = base[0]
         before = len(inflect.setdefault(form_key, {}).setdefault(form, set()))
         inflect[form_key][form].add(base)
         reverse_inflect.setdefault(rev_key, {}).setdefault(base, set()).add(form)
@@ -622,14 +686,10 @@ def main():
         prev_word = ""
         for entry_id, row in indexed_rows:
             word = row["word"]
-            prefix_len = 0
-            limit = min(len(word), len(prev_word))
-            while prefix_len < limit and word[prefix_len] == prev_word[prefix_len]:
-                prefix_len += 1
             lines.append(
                 "\t".join(
                     [
-                        f"{prefix_len},{word[prefix_len:]}",
+                        encode_front_code(word, prev_word),
                         to_base36(entry_id),
                         encode_tag_bitmap(compact_tag(row["tag"])),
                     ]
@@ -640,25 +700,48 @@ def main():
             "\n".join(lines) + "\n"
         )
 
-    for shard, forms in sorted(inflect.items()):
+    inflect_rows = []
+    for forms in inflect.values():
+        for form, bases in forms.items():
+            encoded_bases = []
+            for base in sorted(bases):
+                entry_id = word_to_entry.get(base)
+                if entry_id is None:
+                    raise DictionaryFormatError(f"inflection base is not a canonical entry: {base}")
+                encoded_bases.append(to_base36(entry_id))
+            inflect_rows.append((form, ",".join(encoded_bases)))
+    for initial in "abcdefghijklmnopqrstuvwxyz":
         lines = []
-        for form, bases in sorted(forms.items()):
-            lines.append(form + "\t" + ",".join(sorted(bases)))
-        write_txt(OUT / "inflect" / f"inflect_{shard}.txt", "\n".join(lines) + "\n")
+        previous = ""
+        for form, values in sorted(row for row in inflect_rows if row[0][0] == initial):
+            lines.append(encode_front_code(form, previous) + "\t" + values)
+            previous = form
+        write_txt(OUT / "inflect" / f"inflect_{initial}.txt", "\n".join(lines) + "\n")
 
-    for shard, bases in sorted(reverse_inflect.items()):
+    reverse_rows = []
+    for bases in reverse_inflect.values():
+        for base, forms in bases.items():
+            values = []
+            for form in sorted(forms):
+                entry_id = word_to_entry.get(form)
+                values.append("@" + to_base36(entry_id) if entry_id is not None else form)
+            reverse_rows.append((base, ",".join(values)))
+    for initial in "abcdefghijklmnopqrstuvwxyz":
         lines = []
-        for base, forms in sorted(bases.items()):
-            lines.append(base + "\t" + ",".join(sorted(forms)))
-        write_txt(OUT / "inflect_reverse" / f"ireverse_{shard}.txt",
+        previous = ""
+        for base, values in sorted(row for row in reverse_rows if row[0][0] == initial):
+            lines.append(encode_front_code(base, previous) + "\t" + values)
+            previous = base
+        write_txt(OUT / "inflect_reverse" / f"ireverse_{initial}.txt",
             "\n".join(lines) + "\n"
         )
 
     for shard, shard_rows in sorted(entry_shards.items()):
         lines = []
+        previous_word = ""
         for entry_id, row in shard_rows:
             fields = [
-                row["word"],
+                encode_front_code(row["word"], previous_word),
                 "".join(IPA_MAP.get(c, c) for c in row["phonetic"]),
                 encode_phrase_dict(row["translation"]),
             ]
@@ -666,6 +749,7 @@ def main():
             if tag_code:
                 fields.append(tag_code)
             lines.append("\t".join(fields))
+            previous_word = row["word"]
         write_txt(OUT / "entries" / f"entry_{shard}.txt", "\n".join(lines) + "\n")
 
     # Build cn_index: Chinese phrase → entry IDs (from ECDICT translations)
@@ -680,7 +764,7 @@ def main():
         for phrase in parts:
             phrase = phrase.strip()
             if len(phrase) >= 2 and bool(re.search(r'[\u4e00-\u9fff]', phrase)):
-                bucket = zh_bucket_for(phrase[0])
+                bucket = cn_bucket_for(phrase[0])
                 cn_index.setdefault(bucket, {}).setdefault(phrase, set()).add(entry_id)
 
     # Augment cn_index with CC-CEDICT (Chinese → English reverse lookup)
@@ -708,7 +792,7 @@ def main():
 
             if matched_ids:
                 ccedict_added += 1
-                bucket = zh_bucket_for(phrase[0])
+                bucket = cn_bucket_for(phrase[0])
                 cn_index.setdefault(bucket, {}).setdefault(phrase, set()).update(matched_ids)
 
         print(f"  [CC-CEDICT] 已合并 {ccedict_added} 个中文词组")
@@ -717,16 +801,13 @@ def main():
 
     cn_phrase_count = 0
     cn_link_count = 0
-    for bucket in sorted(cn_index):
+    for bucket_number in range(CN_BUCKET_COUNT):
+        bucket = f"{bucket_number:02x}"
         lines = []
         prev_phrase = ""
-        for phrase in sorted(cn_index[bucket]):
-            prefix_len = 0
-            limit = min(len(phrase), len(prev_phrase))
-            while prefix_len < limit and phrase[prefix_len] == prev_phrase[prefix_len]:
-                prefix_len += 1
-            ids = encode_delta_base36(sorted(cn_index[bucket][phrase]))
-            lines.append(f"{prefix_len},{phrase[prefix_len:]}\t{ids}")
+        for phrase in sorted(cn_index.get(bucket, {})):
+            ids = encode_delta_ids(sorted(cn_index[bucket][phrase]))
+            lines.append(encode_front_code(phrase, prev_phrase) + "\t" + ids)
             cn_phrase_count += 1
             cn_link_count += len(cn_index[bucket][phrase])
             prev_phrase = phrase
@@ -735,14 +816,13 @@ def main():
     zh_char_count = 0
     zh_link_count = 0
     zh_rle_savings = 0
-    for bucket, chars in sorted(zh_index.items()):
+    for bucket_number in range(ZH_BUCKET_COUNT):
+        bucket = f"{bucket_number:02x}"
+        chars = zh_index.get(bucket, {})
         lines = []
         for char, entry_ids in sorted(chars.items()):
-            encoded = encode_delta_base36(sorted(entry_ids))
-            rle_encoded = encode_rle(encoded.split(","))
-            savings = len(encoded) - len(rle_encoded)
-            zh_rle_savings += savings
-            lines.append(char + "\t" + rle_encoded)
+            encoded = encode_delta_ids(sorted(entry_ids))
+            lines.append(char + "\t" + encoded)
             zh_char_count += 1
             zh_link_count += len(entry_ids)
         write_txt(OUT / "zh_index" / f"zh_{bucket}.txt", "\n".join(lines) + "\n")
@@ -750,14 +830,14 @@ def main():
     stats = {
         "source": str(SOURCE),
         "headwords": len(rows),
-        "schema": "compact-v2",
-        "wordIndexFormat": "prefixLen,suffix\\tbase36EntryId\\ttagCode(hex)",
-        "entriesFormat": "word\\tpron\\tdef\\t[tagCode]",
-        "entriesEncoding": "implicit-eid, ipa-mapped, phrase-encoded",
+        "schema": "compact-v3",
+        "wordIndexFormat": "base36PrefixLen+suffix\\tbase36EntryId\\ttagCode(hex)",
+        "entriesFormat": "base36PrefixLen+wordSuffix\\tpron\\tdef\\t[tagCode]",
+        "entriesEncoding": "implicit-eid, front-coded-word, ipa-mapped, phrase-encoded",
         "wordIndexFiles": len(word_indexes),
         "wordIndexEntries": len(rows),
         "wordShards": len(word_indexes),
-        "chineseIdEncoding": "delta-base36",
+        "chineseIdEncoding": "base64url-uleb128-delta",
         "chineseIdOrdering": "strictly-increasing",
         "inflectShards": len(inflect),
         "inflectReverseShards": len(reverse_inflect),
@@ -783,15 +863,17 @@ def main():
         "wordnetLinksAdded": wordnet_links_added,
         "entryShards": len(entry_shards),
         "entryShardSize": ENTRY_SHARD_SIZE,
-        "cnIndexFormat": "prefixLen,suffix\\tdelta-ids(base36)",
-        "inflectFormat": "formEid(base36)\\tbaseEids(base36)",
-        "reverseInflectFormat": "baseEid(base36)\\tformEids(base36)",
-        "zhIndexRLE": True,
-        "zhIndexRLESavingsBytes": zh_rle_savings,
-        "zhBuckets": len(zh_index),
+        "cnIndexFormat": "base36PrefixLen+suffix\\tbase64url-uleb128-delta",
+        "inflectFormat": "base36PrefixLen+form\\tbase36EntryIds",
+        "reverseInflectFormat": "base36PrefixLen+base\\t@base36EntryId-or-raw",
+        "zhIndexRLE": False,
+        "zhIndexRLESavingsBytes": 0,
+        "zhBuckets": ZH_BUCKET_COUNT,
         "zhChars": zh_char_count,
         "zhIndexLinks": zh_link_count,
-        "cnIndexBuckets": len(cn_index),
+        "cnIndexBuckets": CN_BUCKET_COUNT,
+        "cnBucketCount": CN_BUCKET_COUNT,
+        "zhBucketCount": ZH_BUCKET_COUNT,
         "cnIndexPhrases": cn_phrase_count,
         "cnIndexLinks": cn_link_count,
         "ccCedictSource": str(CCEDICT_SOURCE) if CCEDICT_SOURCE.exists() else "",

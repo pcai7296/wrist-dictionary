@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
 import os
@@ -75,45 +76,59 @@ class CompactDictionaryFormatTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.generator = load_generator()
 
-    def test_delta_base36_round_trip_when_ids_are_sorted(self) -> None:
+    def test_delta_base64_round_trip_when_ids_are_sorted(self) -> None:
         # Given
-        entry_ids = [0, 21, 1844, 1849, 14_941]
+        entry_ids = [0, 1, 35, 36, 127, 128, 4_095, 4_096, 14_941]
         encode: Callable[[list[int]], str] | None = getattr(
-            self.generator, "encode_delta_base36", None
+            self.generator, "encode_delta_base64", None
         )
         decode: Callable[[str], list[int]] | None = getattr(
-            self.generator, "decode_delta_base36", None
+            self.generator, "decode_delta_base64", None
         )
 
         # When / Then
-        self.assertIsNotNone(encode, "generator must expose encode_delta_base36")
-        self.assertIsNotNone(decode, "generator must expose decode_delta_base36")
+        self.assertIsNotNone(encode, "generator must expose encode_delta_base64")
+        self.assertIsNotNone(decode, "generator must expose decode_delta_base64")
         assert encode is not None and decode is not None
         self.assertEqual(decode(encode(entry_ids)), entry_ids)
 
-    def test_delta_base36_rejects_malformed_token(self) -> None:
+    def test_delta_base64_rejects_malformed_token(self) -> None:
         # Given
         decode: Callable[[str], list[int]] | None = getattr(
-            self.generator, "decode_delta_base36", None
+            self.generator, "decode_delta_base64", None
         )
 
         # When / Then
-        self.assertIsNotNone(decode, "generator must expose decode_delta_base36")
+        self.assertIsNotNone(decode, "generator must expose decode_delta_base64")
         assert decode is not None
         with self.assertRaises(ValueError):
-            decode("l,!,2")
+            decode("!")
 
-    def test_delta_base36_rejects_non_increasing_ids(self) -> None:
+    def test_delta_base64_rejects_non_increasing_ids(self) -> None:
         # Given
         encode: Callable[[list[int]], str] | None = getattr(
-            self.generator, "encode_delta_base36", None
+            self.generator, "encode_delta_base64", None
         )
 
         # When / Then
-        self.assertIsNotNone(encode, "generator must expose encode_delta_base36")
+        self.assertIsNotNone(encode, "generator must expose encode_delta_base64")
         assert encode is not None
         with self.assertRaises(ValueError):
             encode([21, 21])
+
+    def test_delta_base64_rejects_truncated_uleb_and_overflow(self) -> None:
+        decode = self.generator.decode_delta_base64
+        truncated = base64.urlsafe_b64encode(b"\x80").decode("ascii").rstrip("=")
+        overflow = base64.urlsafe_b64encode(b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\x02").decode("ascii").rstrip("=")
+
+        with self.assertRaises(ValueError):
+            decode(truncated)
+        with self.assertRaises(ValueError):
+            decode(overflow)
+
+    def test_front_code_rejects_invalid_prefix(self) -> None:
+        with self.assertRaises(ValueError):
+            self.generator.decode_front_code("zword", "short")
 
 
 class CompactDictionaryConsumerTest(unittest.TestCase):
@@ -210,9 +225,9 @@ class SemanticValidatorRegressionTest(unittest.TestCase):
             dictionary = self.copy_dictionary(Path(temp_dir) / "dict")
             cn_file = next((dictionary / "cn_index").glob("cn_*.txt"))
             rows = cn_file.read_text(encoding="utf-8").splitlines()
-            row_index = next(index for index, row in enumerate(rows) if "," in row.split("\t", 1)[1])
+            row_index = next(index for index, row in enumerate(rows) if row.split("\t", 1)[1])
             phrase, encoded = rows[row_index].split("\t")
-            rows[row_index] = f"{phrase}\t{encoded.rsplit(',', 1)[0]}"
+            rows[row_index] = f"{phrase}\t!"
             cn_file.write_text("\n".join(rows) + "\n", encoding="utf-8")
             meta_path = dictionary / "meta.json"
             meta = json.loads(meta_path.read_text(encoding="utf-8"))

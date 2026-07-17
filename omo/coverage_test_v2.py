@@ -1,11 +1,13 @@
 """
 腕上词典 — 覆盖率测试 V2（全新测试词，不重复上次）
 """
-import json, os, re, time
+import json, os, re, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DICT_DIR = ROOT / "src" / "common" / "dict"
+sys.path.insert(0, str(ROOT))
+from scripts.generate_watch_dict import decode_delta_ids, decode_front_code
 
 # ── 上次用过的词 (排除这些) ──
 PREVIOUS_ENGLISH = {
@@ -111,12 +113,8 @@ print("\n加载词库...")
 t0 = time.time()
 
 def decode_word_prefix(raw, prev_word):
-    """Decode 'prefixLen,suffix' format. '3,ing' + 'hunt' → 'hunting'."""
-    if "," in raw:
-        cnt_str, suffix = raw.split(",", 1)
-        cnt = int(cnt_str)
-        return prev_word[:cnt] + suffix
-    return raw
+    """Decode compact-v3 one-character Base36 front-coded words."""
+    return decode_front_code(raw, prev_word)
 
 en_word_set = set()
 for shard_file in sorted((DICT_DIR / "words").iterdir()):
@@ -142,12 +140,8 @@ for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
         for line in f:
             parts = line.strip().split("\t")
             if len(parts) >= 2:
-                phrase = parts[0]
-                if "," in phrase:
-                    p = phrase.split(",", 1)
-                    cnt = int(p[0])
-                    phrase = prev_phrase[:cnt] + (p[1] or "")
-                bucket_map[phrase] = parts[1].split(",")
+                phrase = decode_front_code(parts[0], prev_phrase)
+                bucket_map[phrase] = decode_delta_ids(parts[1])
                 prev_phrase = phrase
     cn_index[cn_file.stem.replace("cn_", "")] = bucket_map
 
@@ -174,7 +168,7 @@ def search_english(word):
     return "miss"
 
 def zh_bucket(ch):
-    return f"{ord(ch) % 64:02x}"
+    return f"{ord(ch) % 96:02x}"
 
 def search_chinese(phrase):
     first = ""

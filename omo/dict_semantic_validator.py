@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import re
 from dataclasses import asdict, dataclass
@@ -19,6 +20,7 @@ EXPECTED_ZH_LINKS = 135_638
 EXPECTED_INFLECT_LINKS = 26_225
 EXPECTED_REVERSE_INFLECT_LINKS = 26_225
 BASE36_TOKEN = re.compile(r"^[0-9a-z]+$")
+BASE64URL_TOKEN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 class DictionaryValidationError(ValueError):
@@ -37,36 +39,47 @@ class SemanticCounts:
     reverse_inflect_links: int
 
 
-def decode_delta_base36(value: str) -> list[int]:
-    """Decode comma-separated base36 deltas (with optional RLE ^N suffix), rejecting malformed input."""
-    if not value:
-        raise DictionaryValidationError("delta-base36 list must not be empty")
+def decode_delta_base64(value: str) -> list[int]:
+    """Decode compact-v3 unpadded URL-safe Base64 ULEB128 deltas."""
+    if not value or not BASE64URL_TOKEN.fullmatch(value):
+        raise DictionaryValidationError("invalid Base64 ID list")
+    try:
+        payload = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise DictionaryValidationError("invalid Base64 ID list") from exc
     result: list[int] = []
     current = 0
-    for token in value.split(","):
-        # Check for RLE: value^count
-        if "^" in token:
-            if not re.match(r"^[0-9a-z]+\^[0-9]+$", token):
-                raise DictionaryValidationError(f"invalid RLE token: {token!r}")
-            val_str, count_str = token.split("^", 1)
-            repeat = int(count_str)
-            if repeat < 2 or repeat > 200:
-                raise DictionaryValidationError(f"RLE count out of range: {token!r}")
-            delta = int(val_str, 36)
-            for _ in range(repeat):
-                current += delta
-                if result and current <= result[-1]:
-                    raise DictionaryValidationError("decoded IDs must be strictly increasing")
-                result.append(current)
-        else:
-            if not BASE36_TOKEN.fullmatch(token):
-                raise DictionaryValidationError(f"invalid delta-base36 token: {token!r}")
-            delta = int(token, 36)
-            current += delta
-            if result and current <= result[-1]:
-                raise DictionaryValidationError("decoded IDs must be strictly increasing")
-            result.append(current)
+    delta = 0
+    shift = 0
+    for byte in payload:
+        if shift > 28:
+            raise DictionaryValidationError("ULEB128 value exceeds 32 bits")
+        delta |= (byte & 0x7F) << shift
+        if byte & 0x80:
+            shift += 7
+            continue
+        current += delta
+        if result and current <= result[-1]:
+            raise DictionaryValidationError("decoded IDs must be strictly increasing")
+        result.append(current)
+        delta = 0
+        shift = 0
+    if shift or not result:
+        raise DictionaryValidationError("truncated or empty ULEB128 ID list")
     return result
+
+
+decode_delta_base36 = decode_delta_base64
+
+
+def decode_prefix_field(raw: str, previous: str) -> str:
+    """Decode a compact-v3 one-character Base36 front-coded field."""
+    if not raw or raw[0] not in "0123456789abcdefghijklmnopqrstuvwxyz":
+        raise DictionaryValidationError(f"invalid front-coded field: {raw!r}")
+    prefix_len = int(raw[0], 36)
+    if prefix_len > len(previous):
+        raise DictionaryValidationError("front-code prefix exceeds previous value")
+    return previous[:prefix_len] + raw[1:]
 
 
 def decode_legacy_ids(value: str) -> list[int]:
@@ -80,33 +93,31 @@ def read_tab_rows(path: Path) -> list[list[str]]:
 
 
 def read_entries() -> tuple[dict[int, tuple[str, str, str, str]], set[int]]:
-    """Load canonical full entries keyed by entry ID (compact-v2: implicit eid, 3-4 fields)."""
+    """Load compact-v3 front-coded canonical entries keyed by implicit entry ID."""
     entries: dict[int, tuple[str, str, str, str]] = {}
     for path in sorted((DICT_DIR / "entries").glob("entry_*.txt")):
         shard = int(path.stem.split("_")[-1])
         base_id = shard * 500
+        previous_word = ""
         for line_idx, parts in enumerate(read_tab_rows(path)):
             if len(parts) not in (3, 4):
                 raise DictionaryValidationError(f"invalid entry row in {path.name}: {parts!r}")
             entry_id = base_id + line_idx
-            word, pron, trans = parts[0], parts[1], parts[2]
+            word = decode_prefix_field(parts[0], previous_word)
+            previous_word = word
+            pron, trans = parts[1], parts[2]
             tag = parts[3] if len(parts) >= 4 else ""
             entries[entry_id] = (word, pron, trans, tag)
     return entries, set(entries)
 
 
 def decode_word_prefix(parts: list[str], prev_word: str) -> str:
-    """Decode prefix-encoded word field. '3,ing' + prev='hunt' → 'hunting'."""
-    raw = parts[0]
-    if "," in raw:
-        cnt_str, suffix = raw.split(",", 1)
-        cnt = int(cnt_str)
-        return prev_word[:cnt] + suffix
-    return raw
+    """Decode compact-v3 front-coded word field."""
+    return decode_prefix_field(parts[0], prev_word)
 
 
 def read_words(entries: dict[int, tuple[str, str, str, str]]) -> dict[str, int]:
-    """Load compact word-to-entry mappings (compact-v2: prefix-encoded words, base36 eids)."""
+    """Load compact-v3 word-to-entry mappings."""
     compact_paths = sorted((DICT_DIR / "words").glob("word_*.txt"))
     words: dict[str, int] = {}
     for path in compact_paths:
@@ -135,9 +146,9 @@ def read_words(entries: dict[int, tuple[str, str, str, str]]) -> dict[str, int]:
 def read_index(directory: str, prefix: str, *, compact: bool) -> tuple[dict[str, tuple[int, ...]], int]:
     """Load a Chinese index and return mappings plus link count.
 
-    compact-v2: cn_index uses prefix encoding for phrases.
+    compact-v3: cn_index uses front-coded phrases and both indexes use Base64 ULEB128 IDs.
     """
-    decoder = decode_delta_base36 if compact else decode_legacy_ids
+    decoder = decode_delta_base64 if compact else decode_legacy_ids
     mappings: dict[str, tuple[int, ...]] = {}
     link_count = 0
     for path in sorted((DICT_DIR / directory).glob(f"{prefix}_*.txt")):
@@ -147,10 +158,8 @@ def read_index(directory: str, prefix: str, *, compact: bool) -> tuple[dict[str,
                 raise DictionaryValidationError(f"invalid index row in {path.name}: {parts!r}")
             # Decode prefix-encoded phrase (cn_index only)
             phrase = parts[0]
-            if "," in phrase:
-                p = phrase.split(",", 1)
-                cnt = int(p[0])
-                phrase = prev_phrase[:cnt] + (p[1] or "")
+            if directory == "cn_index":
+                phrase = decode_prefix_field(phrase, prev_phrase)
             ids = tuple(decoder(parts[1]))
             mappings[phrase] = ids
             link_count += len(ids)
@@ -167,14 +176,36 @@ def count_links(directory: str, prefix: str) -> int:
     return total
 
 
-def read_links(directory: str, prefix: str) -> dict[str, tuple[str, ...]]:
-    """Load word-based inflection relationships (excludes _eid shards)."""
-    return {
-        parts[0]: tuple(parts[1].split(","))
-        for path in sorted((DICT_DIR / directory).glob(f"{prefix}_*.txt"))
-        if "_eid_" not in path.name
-        for parts in read_tab_rows(path)
-    }
+def read_links(
+    directory: str,
+    prefix: str,
+    entries: dict[int, tuple[str, str, str, str]],
+) -> dict[str, tuple[str, ...]]:
+    """Load compact-v3 front-coded inflection relationships as words."""
+    links: dict[str, tuple[str, ...]] = {}
+    for path in sorted((DICT_DIR / directory).glob(f"{prefix}_*.txt")):
+        previous = ""
+        for parts in read_tab_rows(path):
+            if len(parts) != 2:
+                raise DictionaryValidationError(f"invalid inflection row in {path.name}: {parts!r}")
+            key = decode_prefix_field(parts[0], previous)
+            previous = key
+            values: list[str] = []
+            for value in parts[1].split(","):
+                if value.startswith("@"):
+                    entry_id = int(value[1:], 36)
+                    if entry_id not in entries:
+                        raise DictionaryValidationError(f"unknown inflection entry ID: {entry_id}")
+                    values.append(entries[entry_id][0])
+                elif directory == "inflect":
+                    entry_id = int(value, 36)
+                    if entry_id not in entries:
+                        raise DictionaryValidationError(f"unknown inflection entry ID: {entry_id}")
+                    values.append(entries[entry_id][0])
+                else:
+                    values.append(value)
+            links[key] = tuple(values)
+    return links
 
 
 def validate(*, require_compact: bool) -> SemanticCounts:
@@ -184,8 +215,8 @@ def validate(*, require_compact: bool) -> SemanticCounts:
     compact = bool(list((DICT_DIR / "words").glob("word_*.txt")))
     cn_index, cn_links = read_index("cn_index", "cn", compact=compact)
     zh_index, zh_links = read_index("zh_index", "zh", compact=compact)
-    inflect = read_links("inflect", "inflect")
-    reverse_inflect = read_links("inflect_reverse", "ireverse")
+    inflect = read_links("inflect", "inflect", entries)
+    reverse_inflect = read_links("inflect_reverse", "ireverse", entries)
     inflect_links = count_links("inflect", "inflect")
     reverse_links = count_links("inflect_reverse", "ireverse")
 
@@ -242,12 +273,16 @@ def validate(*, require_compact: bool) -> SemanticCounts:
         compact_checks = (
             (compact, "compact word index is missing"),
             (len(list((DICT_DIR / "words").glob("word_*.txt"))) == 26, "word shard count changed"),
-            (meta.get("schema") == "compact-v2", "compact schema marker changed"),
+            (meta.get("schema") == "compact-v3", "compact schema marker changed"),
             (
-                meta.get("wordIndexFormat") == "prefixLen,suffix\\tbase36EntryId\\ttagCode(hex)",
+                meta.get("wordIndexFormat") == "base36PrefixLen+suffix\\tbase36EntryId\\ttagCode(hex)",
                 "word index format changed",
             ),
-            (meta.get("chineseIdEncoding") == "delta-base36", "Chinese ID encoding changed"),
+            (meta.get("chineseIdEncoding") == "base64url-uleb128-delta", "Chinese ID encoding changed"),
+            (len(list((DICT_DIR / "cn_index").glob("cn_*.txt"))) == 96, "cn bucket count changed"),
+            (len(list((DICT_DIR / "zh_index").glob("zh_*.txt"))) == 64, "zh bucket count changed"),
+            (len(list((DICT_DIR / "inflect").glob("inflect_*.txt"))) == 26, "inflect shard count changed"),
+            (len(list((DICT_DIR / "inflect_reverse").glob("ireverse_*.txt"))) == 26, "reverse inflect shard count changed"),
         )
         for valid, message in compact_checks:
             if not valid:

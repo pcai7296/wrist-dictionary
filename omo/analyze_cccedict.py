@@ -8,6 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMP = os.environ["TEMP"]
 DICT_DIR = ROOT / "src" / "common" / "dict"
+sys.path.insert(0, str(ROOT))
+from scripts.generate_watch_dict import decode_front_code
 
 # ── 1. Parse CC-CEDICT ──
 CCEDICT_PATH = TEMP + "\\cedict.txt.gz"
@@ -51,12 +53,8 @@ print(f"Parsed entries (2+ Chinese chars): {len(parsed)}")
 # ── 2. Load existing dictionary word set ──
 print("\nLoading existing dictionary...")
 def decode_word_prefix(raw, prev_word):
-    """Decode 'prefixLen,suffix' format. '3,ing' + 'hunt' → 'hunting'."""
-    if "," in raw:
-        cnt_str, suffix = raw.split(",", 1)
-        cnt = int(cnt_str)
-        return prev_word[:cnt] + suffix
-    return raw
+    """Decode compact-v3 one-character Base36 front-coded words."""
+    return decode_front_code(raw, prev_word)
 
 en_word_set = set()
 for shard_file in sorted((DICT_DIR / "words").iterdir()):

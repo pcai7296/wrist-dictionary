@@ -42,7 +42,7 @@ omo/
 - Chinese exact/prefix match
 - Coverage percentage report
 
-Compact rows are `word<TAB>entryId<TAB>tag`; full English and Chinese results hydrate from canonical `entries/entry_<nn>.txt`. Chinese index ID lists are strictly increasing delta-base36 values. `dict_semantic_validator.py --require-compact` checks these contracts and rejects legacy `index_en.txt` / `dict_*.txt` layouts.
+Compact-v3 rows use one-character Base36 front-coded words plus `entryId<TAB>tag`; full English and Chinese results hydrate from canonical front-coded `entries/entry_<nn>.txt`. Chinese index ID lists are strictly increasing Base64-ULEB128 values, with 96 cn buckets and 64 zh buckets. `dict_semantic_validator.py --require-compact` checks these contracts and rejects legacy `index_en.txt` / `dict_*.txt` layouts.
 
 ## ANTI-PATTERNS
 

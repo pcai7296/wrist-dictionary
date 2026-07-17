@@ -45,6 +45,7 @@
 import router from "@system.router"
 import file from "@system.file"
 import prompt from "@system.prompt"
+import {decodeDeltaIds, decodePrefixField, parseBase36} from "../../common/dictCodec"
 
 const FUZZY_SCAN_LIMIT = 4000
 const FUZZY_POOL_LIMIT = 80
@@ -393,7 +394,7 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2 && parts[0] === firstChar) {
-          done(this.decodeDeltaIds(parts[1]))
+          done(decodeDeltaIds(parts[1]))
           return
         }
       }
@@ -453,13 +454,11 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2) {
-          var phrase = parts[0]
-          if (phrase.indexOf(",") >= 0) {
-            var p = phrase.split(",")
-            var cnt = parseInt(p[0], 10)
-            phrase = prevPhrase.slice(0, cnt) + (p[1] || "")
+          var phrase = decodePrefixField(parts[0], prevPhrase)
+          if (phrase === null) {
+            continue
           }
-          indexMap[phrase] = this.decodeDeltaIds(parts[1])
+          indexMap[phrase] = decodeDeltaIds(parts[1])
           prevPhrase = phrase
         }
       }
@@ -475,7 +474,7 @@ export default {
       return
     }
 
-    const bucket = this.zhBucketFor(firstChar)
+    const bucket = this.cnBucketFor(firstChar)
     this.loadCnIndex(bucket, (indexMap) => {
       let ids = indexMap[query]
 
@@ -560,13 +559,19 @@ export default {
       const entries = {}
       const baseId = parseInt(shard, 10) * 500
       const lines = text.split("\n")
+      var previousWord = ""
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 3) {
           var entryId = baseId + i
+          var word = decodePrefixField(parts[0], previousWord)
+          if (word === null) {
+            continue
+          }
+          previousWord = word
           var tag = this._expandTag(parts[3] || "")
           entries[entryId] = {
-            word: parts[0],
+            word: word,
             phonetic: parts[1] || "",
             translation: parts[2] || "",
             tag: tag
@@ -626,14 +631,24 @@ export default {
     const shard = this.keyFor(query)
     this.readText("/common/dict/inflect/inflect_" + shard + ".txt", (text) => {
       const bases = []
+      var previousForm = ""
       const lines = text.split("\n")
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
-        if (parts.length >= 2 && parts[0] === query) {
-          const words = parts[1].split(",")
-          for (let j = 0; j < words.length; j++) {
-            if (words[j]) {
-              bases.push(words[j])
+        if (parts.length < 2) {
+          continue
+        }
+        const form = decodePrefixField(parts[0], previousForm)
+        if (form === null) {
+          continue
+        }
+        previousForm = form
+        if (form === query) {
+          const ids = parts[1].split(",")
+          for (let j = 0; j < ids.length; j++) {
+            const entryId = parseBase36(ids[j])
+            if (entryId >= 0) {
+              bases.push(entryId)
             }
           }
           break
@@ -654,15 +669,32 @@ export default {
     const shard = this.keyFor(query)
     this.readText("/common/dict/inflect_reverse/ireverse_" + shard + ".txt", (text) => {
       const forms = []
+      var previousBase = ""
       const lines = text.split("\n")
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
-        if (parts.length >= 2 && parts[0] === query) {
-          const words = parts[1].split(",")
-          for (let j = 0; j < words.length; j++) {
-            const w = words[j]
-            if (w && w !== query && !seen[w]) {
-              forms.push(w)
+        if (parts.length < 2) {
+          continue
+        }
+        const base = decodePrefixField(parts[0], previousBase)
+        if (base === null) {
+          continue
+        }
+        previousBase = base
+        if (base === query) {
+          const values = parts[1].split(",")
+          for (let j = 0; j < values.length; j++) {
+            const value = values[j]
+            if (!value) {
+              continue
+            }
+            if (value.charAt(0) === "@") {
+              const entryId = parseBase36(value.slice(1))
+              if (entryId >= 0) {
+                forms.push(entryId)
+              }
+            } else if (value !== query && !seen[value]) {
+              forms.push(value)
             }
           }
           break
@@ -679,6 +711,23 @@ export default {
     }
 
     const form = forms[index]
+    if (typeof form === "number") {
+      const shard = this.entryShardFor(form)
+      this.loadEntryShard(shard, (entries) => {
+        const item = entries[form]
+        if (item) {
+          const lower = this.normalizeWord(item.word)
+          if (!seen[lower]) {
+            seen[lower] = true
+            results.push(
+              this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
+            )
+          }
+        }
+        this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+      })
+      return
+    }
     const lower = this.normalizeWord(form)
     if (!lower || seen[lower]) {
       this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
@@ -759,6 +808,23 @@ export default {
     }
 
     const base = bases[index]
+    if (typeof base === "number") {
+      const shard = this.entryShardFor(base)
+      this.loadEntryShard(shard, (entries) => {
+        const item = entries[base]
+        if (item) {
+          const lower = this.normalizeWord(item.word)
+          if (!seen[lower]) {
+            seen[lower] = true
+            results.push(
+              this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
+            )
+          }
+        }
+        this.collectBaseResults(bases, results, seen, index + 1, done)
+      })
+      return
+    }
     const first = this.normalizeWord(base).charAt(0)
     if (first < "a" || first > "z") {
       this.collectBaseResults(bases, results, seen, index + 1, done)
@@ -775,13 +841,7 @@ export default {
   },
 
   _decodeWordPrefix(parts, prevWord) {
-    var word = parts[0]
-    if (word.indexOf(",") >= 0) {
-      var p = word.split(",")
-      var cnt = parseInt(p[0], 10)
-      word = prevWord.slice(0, cnt) + (p[1] || "")
-    }
-    return word
+    return decodePrefixField(parts[0], prevWord) || ""
   },
 
   collectCompactWordCandidates(text, query, candidates, seen, source, limit) {
@@ -1299,90 +1359,16 @@ export default {
     return this.padHex(ch.charCodeAt(0) % 64)
   },
 
+  cnBucketFor(ch) {
+    return this.padHex(ch.charCodeAt(0) % 96)
+  },
+
   padHex(value) {
     const hex = value.toString(16)
     if (hex.length < 2) {
       return "0" + hex
     }
     return hex
-  },
-
-  decodeDeltaIds(value) {
-    if (typeof value !== "string") {
-      return []
-    }
-
-    const normalized = value.trim()
-    if (!normalized) {
-      return []
-    }
-    const tokens = normalized.split(",")
-    const ids = []
-    let currentId = 0
-    let firstToken = true
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i]
-      if (!token) {
-        return []
-      }
-
-      // Check for RLE: value^count (^ is not a valid base36 char)
-      var delta = 0
-      var repeat = 1
-      const caretIdx = token.indexOf("^")
-      if (caretIdx >= 0) {
-        const valStr = token.slice(0, caretIdx)
-        const countStr = token.slice(caretIdx + 1)
-        if (!valStr || !countStr || !/^[0-9a-z]+$/.test(valStr) || !/^[1-9][0-9]*$/.test(countStr)) {
-          return []
-        }
-        repeat = parseInt(countStr, 10)
-        if (repeat < 2 || repeat > 200) {
-          return []
-        }
-        delta = this._parseBase36(valStr)
-        if (delta < 0) {
-          return []
-        }
-      } else {
-        if (!/^[0-9a-z]+$/.test(token)) {
-          return []
-        }
-        delta = this._parseBase36(token)
-        if (delta < 0) {
-          return []
-        }
-      }
-
-      // Only first token may have zero delta
-      if (!firstToken && delta === 0) {
-        return []
-      }
-      firstToken = false
-
-      for (let r = 0; r < repeat; r++) {
-        if (currentId > MAX_SAFE_ENTRY_ID - delta) {
-          return []
-        }
-        currentId += delta
-        ids.push(currentId)
-      }
-    }
-    return ids
-  },
-
-  _parseBase36(str) {
-    let result = 0
-    for (let j = 0; j < str.length; j++) {
-      const ch = str.charAt(j)
-      const code = ch.charCodeAt(0)
-      const digit = code >= 48 && code <= 57 ? code - 48 : code - 87
-      if (digit < 0 || digit >= 36 || result > Math.floor((MAX_SAFE_ENTRY_ID - digit) / 36)) {
-        return -1
-      }
-      result = result * 36 + digit
-    }
-    return result
   },
 
   parseEntryId(value) {
@@ -1413,19 +1399,8 @@ export default {
 
   keyFor(value) {
     const word = this.normalizeWord(value)
-    let key = ""
-    for (let i = 0; i < word.length && key.length < 2; i++) {
-      const ch = word.charAt(i)
-      if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) {
-        key += ch
-      } else {
-        key += "_"
-      }
-    }
-    while (key.length < 2) {
-      key += "_"
-    }
-    return key
+    const first = word.charAt(0)
+    return first >= "a" && first <= "z" ? first : "_"
   },
 
   onTouchStart(evt) {

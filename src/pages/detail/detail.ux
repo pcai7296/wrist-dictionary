@@ -33,6 +33,7 @@ import router from "@system.router"
 import storage from "@system.storage"
 import file from "@system.file"
 import prompt from "@system.prompt"
+import {decodePrefixField, parseBase36} from "../../common/dictCodec"
 
 var TAG_CODE_MAP = {z: 'zk', g: 'gk', '4': 'cet4', '6': 'cet6', k: 'ky', t: 'toefl', i: 'ielts', e: 'gre'}
 var TAG_LABELS = ['zk', 'gk', 'cet4', 'cet6', 'ky', 'ielts', 'toefl', 'gre']
@@ -442,21 +443,15 @@ export default {
     return (value || "").toLowerCase().trim()
   },
 
+  entryShardFor(entryId) {
+    const index = Math.floor(entryId / 500)
+    return index < 10 ? "0" + index : "" + index
+  },
+
   keyFor(value) {
     const word = this.normalizeWord(value)
-    let key = ""
-    for (let i = 0; i < word.length && key.length < 2; i++) {
-      const ch = word.charAt(i)
-      if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) {
-        key += ch
-      } else {
-        key += "_"
-      }
-    }
-    while (key.length < 2) {
-      key += "_"
-    }
-    return key
+    const first = word.charAt(0)
+    return first >= "a" && first <= "z" ? first : "_"
   },
 
   readText(uri, done) {
@@ -487,13 +482,98 @@ export default {
       if (!revText) {
         return
       }
-      const allForms = this.scanReverseInflect(revText, base)
-      if (allForms.length > 0) {
-        if (showSource) {
-          this.sourceWord = base
+      const values = this.scanReverseInflect(revText, base)
+      this.resolveReverseInflectValues(values, currentWord, [], 0, (allForms) => {
+        if (allForms.length > 0) {
+          if (showSource) {
+            this.sourceWord = base
+          }
+          this.inflectForms = allForms.slice(0, 10)
         }
-        this.inflectForms = allForms.filter((f) => f !== currentWord).slice(0, 10)
+      })
+    })
+  },
+
+  scanReverseInflect(text, base) {
+    const lines = text.split("\n")
+    const values = []
+    let previous = ""
+    for (let i = 0; i < lines.length; i++) {
+      const parts = lines[i].split("\t")
+      if (parts.length < 2) {
+        continue
       }
+      const word = decodePrefixField(parts[0], previous)
+      if (word === null) {
+        continue
+      }
+      previous = word
+      if (word !== base) {
+        continue
+      }
+      const encoded = parts[1].split(",")
+      for (let j = 0; j < encoded.length; j++) {
+        const value = encoded[j]
+        if (!value) {
+          continue
+        }
+        if (value.charAt(0) === "@") {
+          const entryId = parseBase36(value.slice(1))
+          if (entryId >= 0) {
+            values.push(entryId)
+          }
+        } else {
+          values.push(value)
+        }
+      }
+      break
+    }
+    return values
+  },
+
+  resolveReverseInflectValues(values, currentWord, output, index, done) {
+    if (index >= values.length || output.length >= 10) {
+      done(output)
+      return
+    }
+    const value = values[index]
+    if (typeof value === "string") {
+      if (value !== currentWord && output.indexOf(value) < 0) {
+        output.push(value)
+      }
+      this.resolveReverseInflectValues(values, currentWord, output, index + 1, done)
+      return
+    }
+    this.loadEntryWord(value, (word) => {
+      if (word && word !== currentWord && output.indexOf(word) < 0) {
+        output.push(word)
+      }
+      this.resolveReverseInflectValues(values, currentWord, output, index + 1, done)
+    })
+  },
+
+  loadEntryWord(entryId, done) {
+    const shard = this.entryShardFor(entryId)
+    this.readText("/common/dict/entries/entry_" + shard + ".txt", (text) => {
+      const lines = text.split("\n")
+      let previous = ""
+      const baseId = parseInt(shard, 10) * 500
+      for (let i = 0; i < lines.length; i++) {
+        const parts = lines[i].split("\t")
+        if (parts.length < 3) {
+          continue
+        }
+        const word = decodePrefixField(parts[0], previous)
+        if (word === null) {
+          continue
+        }
+        previous = word
+        if (baseId + i === entryId) {
+          done(word)
+          return
+        }
+      }
+      done("")
     })
   },
 

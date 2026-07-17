@@ -43,6 +43,7 @@ import storage from "@system.storage"
 import prompt from "@system.prompt"
 import file from "@system.file"
 import {setSuggestionSeed, setSuggestions} from "../../common/suggestionState"
+import {decodePrefixField} from "../../common/dictCodec"
 
 const ENGLISH_SUFFIXES = [
   "s",
@@ -118,13 +119,7 @@ export default {
   },
 
   _decodeWordPrefix(parts, prevWord) {
-    var word = parts[0]
-    if (word.indexOf(",") >= 0) {
-      var p = word.split(",")
-      var cnt = parseInt(p[0], 10)
-      word = prevWord.slice(0, cnt) + (p[1] || "")
-    }
-    return word
+    return decodePrefixField(parts[0], prevWord) || ""
   },
 
   _parseSuggestionLines(text) {
