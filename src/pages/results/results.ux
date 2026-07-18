@@ -11,7 +11,7 @@
     <text if="{{ !queryMarqueeOn }}" class="query-text">{{ queryText }}</text>
     <text class="status-text" if="{{ statusText }}">{{ statusText }}</text>
 
-    <list class="result-list" if="{{ resultCards.length > 0 }}" style="width: {{cardWidth}}px;">
+    <list id="result-list" class="result-list" if="{{ resultCards.length > 0 }}" style="width: {{cardWidth}}px;">
       <list-item
         class="result-item"
         type="resultCard"
@@ -1505,15 +1505,31 @@ export default {
 
   _goToNextPage() {
     this.searchPage++
-    this._loadAndRenderPage()
+    var self = this
+    this._loadAndRenderPage(function() {
+      setTimeout(function() {
+        var list = self.$element("result-list")
+        if (list && list.scrollTo) {
+          list.scrollTo({index: 0})
+        }
+      }, 100)
+    })
   },
 
   _goToPrevPage() {
     this.searchPage--
-    this._loadAndRenderPage()
+    var self = this
+    this._loadAndRenderPage(function() {
+      setTimeout(function() {
+        var list = self.$element("result-list")
+        if (list && list.scrollTo && self.resultCards.length > 0) {
+          list.scrollTo({index: self.resultCards.length - 1})
+        }
+      }, 100)
+    })
   },
 
-  _loadAndRenderPage() {
+  _loadAndRenderPage(callback) {
     var self = this
     var pageSize = 20
     var start = this.searchPage * pageSize
@@ -1534,7 +1550,7 @@ export default {
 
     function loadNext() {
       if (shardIdx >= shardKeys.length) {
-        self._buildPageView(newCards)
+        self._buildPageView(newCards, callback)
         return
       }
       var shard = parseInt(shardKeys[shardIdx], 10)
@@ -1560,7 +1576,7 @@ export default {
     loadNext()
   },
 
-  _buildPageView(cards) {
+  _buildPageView(cards, callback) {
     var pageCards = []
     if (this.searchPage > 0) {
       pageCards.push({
@@ -1588,6 +1604,7 @@ export default {
     }
     this.resultCards = pageCards
     this._updatePaginationStatus()
+    if (callback) callback()
   },
 
   createResultCard(entryId, id, word, phonetic, translation, tag) {
