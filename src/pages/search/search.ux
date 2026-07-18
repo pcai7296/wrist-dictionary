@@ -289,8 +289,6 @@ export default {
       return
     }
 
-    this.saveSearchHistory(normalized)
-
     router.push({
       uri: "/pages/results",
       params: {

@@ -141,7 +141,8 @@ export default {
     historyCache: null,
     searchPage: 0,
     collectedIds: [],
-    totalResultCount: 0
+    totalResultCount: 0,
+    mightHaveMore: false
   },
 
   _expandTag(s) {
@@ -286,6 +287,7 @@ export default {
     this.searchPage = 0
     this.collectedIds = []
     this.totalResultCount = 0
+    this.mightHaveMore = false
     this._startFlushTimer()
 
     var self = this
@@ -1415,8 +1417,9 @@ export default {
         allIds.push(this.collectedIds[i])
       }
     }
+    this.mightHaveMore = this.collectedIds.length >= 40
     this.collectedIds = allIds
-    this.totalResultCount = Math.min(allIds.length, 60)
+    this.totalResultCount = allIds.length
     this._updatePaginationStatus()
     this._saveSearchHistory()
     this._appendNextButton()
@@ -1437,12 +1440,14 @@ export default {
   },
 
   _updatePaginationStatus() {
-    if (this.totalResultCount <= 20) {
-      this.statusText = "搜索结果" + this.resultCards.length + "条"
-    } else if (this.totalResultCount <= 60) {
-      this.statusText = "当前第" + (this.searchPage + 1) + "页，搜索结果一共" + this.totalResultCount + "条"
+    var total = this.totalResultCount
+    var pageNum = this.searchPage + 1
+    if (total <= 20) {
+      this.statusText = "一共" + total + "条"
+    } else if (this.mightHaveMore) {
+      this.statusText = "当前第" + pageNum + "页，最多加载60条"
     } else {
-      this.statusText = "当前第" + (this.searchPage + 1) + "页，最大显示60条"
+      this.statusText = "当前第" + pageNum + "页，一共" + total + "条"
     }
   },
 
@@ -1533,7 +1538,7 @@ export default {
     var self = this
     var pageSize = 20
     var start = this.searchPage * pageSize
-    var end = Math.min(start + pageSize, this.totalResultCount)
+    var end = Math.min(start + pageSize, this.totalResultCount, 60)
     var pageIds = this.collectedIds.slice(start, end)
 
     var groups = {}
@@ -1592,7 +1597,7 @@ export default {
       pageCards.push(cards[i])
     }
     var nextStart = (this.searchPage + 1) * 20
-    if (nextStart < this.totalResultCount) {
+    if (nextStart < this.totalResultCount && nextStart < 60) {
       pageCards.push({
         id: "next_page",
         recordKind: "next-page",

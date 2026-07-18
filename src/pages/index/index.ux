@@ -43,6 +43,7 @@
 
 <script>
 import device from "@system.device"
+import storage from "@system.storage"
 import router from "@system.router"
 
 export default {
@@ -61,6 +62,37 @@ export default {
       fail: (data, code) => {
         console.log("index device.getInfo failed: " + code)
       }
+    })
+    this._cleanInvalidHistory()
+  },
+
+  _cleanInvalidHistory() {
+    storage.get({
+      key: "dic_history",
+      success: function(data) {
+        var text = data && (data.value || data)
+        if (!text) return
+        var list
+        try { list = JSON.parse(text) } catch (e) { return }
+        if (!list || !list.length) return
+
+        var clean = []
+        for (var i = 0; i < list.length; i++) {
+          var item = list[i]
+          // Keep only entries with valid query AND cached ids (drop old format)
+          if (item && item.query && item.query.toString().trim() && item.ids && item.ids.length > 0) {
+            clean.push(item)
+          }
+        }
+
+        if (clean.length < list.length) {
+          storage.set({
+            key: "dic_history",
+            value: JSON.stringify(clean)
+          })
+        }
+      },
+      fail: function() {}
     })
   },
 

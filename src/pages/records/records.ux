@@ -12,7 +12,10 @@
         tid="id"
         style="width: {{cardWidth}}px; height: {{ item.itemHeight }}px;"
       >
-        <div class="record-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openRecord(item)">
+        <div if="{{ item.recordKind === 'clear-history' }}" class="clear-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="clearHistory">
+          <text class="clear-text">清空历史记录</text>
+        </div>
+        <div else class="record-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openRecord(item)">
           <div class="record-head">
             <text if="{{ !item.wordMarqueeOn }}" class="record-title">{{ item.title }}</text>
             <text if="{{ item.wordMarqueeOn && !marqueeArmed }}" class="record-title">{{ item.title }}</text>
@@ -253,7 +256,27 @@ export default {
         wordMarqueeSpeed: wordMarqueeSpeed
       })
     }
+    if (this.type === "history" && output.length > 0) {
+      output.push({
+        id: "clear_history",
+        recordKind: "clear-history",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+    }
     return output
+  },
+
+  clearHistory() {
+    storage.set({
+      key: "dic_history",
+      value: "[]"
+    })
+    router.replace({
+      uri: "/pages/index"
+    })
   },
 
   wrapText(value, maxWidth) {
@@ -453,6 +476,20 @@ export default {
   border-radius: 20px;
   background-color: #242424;
   flex-direction: column;
+}
+
+.clear-card {
+  margin-bottom: 10px;
+  border-radius: 20px;
+  background-color: #8b0000;
+  justify-content: center;
+  align-items: center;
+}
+
+.clear-text {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
 }
 
 .record-head {

@@ -632,6 +632,7 @@ def main():
     zh_index = {}
     word_set = {row["word"].lower() for row in rows}
     word_to_entry = {row["word"].lower(): entry_id for entry_id, row in enumerate(rows)}
+    word_phonetics = {row["word"].lower(): row["phonetic"] for row in rows if row["phonetic"]}
     exchange_links = 0
     word_family_links_added = 0
 
@@ -740,9 +741,16 @@ def main():
         lines = []
         previous_word = ""
         for entry_id, row in shard_rows:
+            phonetic = row["phonetic"]
+            # Inherit phonetic from base word when empty (e.g. regular inflections)
+            if not phonetic and row["exchange"]:
+                for form in parse_exchange(row["exchange"]):
+                    if len(form) > 1 and form.lower() in word_phonetics:
+                        phonetic = word_phonetics[form.lower()]
+                        break
             fields = [
                 encode_front_code(row["word"], previous_word),
-                "".join(IPA_MAP.get(c, c) for c in row["phonetic"]),
+                "".join(IPA_MAP.get(c, c) for c in phonetic),
                 encode_phrase_dict(row["translation"]),
             ]
             tag_code = encode_tag_bitmap(compact_tag(row["tag"]))
