@@ -1,0 +1,441 @@
+<template>
+  <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="back-button" @click="goBack">
+      <text class="back-text">返回</text>
+    </div>
+    <div if="{{ mode === 'input' }}" class="input-row input-row-{{screenProfile}}" style="width: {{cardWidth}}px;">
+      <marquee class="input-text input-text-{{screenProfile}}"
+        scrollamount="40" direction="left" loop="-1" text-offset="40">
+        {{ inputText }}
+      </marquee>
+    </div>
+    <list class="filter-list filter-list-{{mode}}" style="width: {{cardWidth}}px;">
+      <list-item if="{{ mode !== 'input' }}" type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="selectFilter('全部')">
+          <div class="record-head">
+            <text class="record-title">全部</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item if="{{ mode === 'input' }}" type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card delete-card" @click="deleteChar">
+          <div class="record-head">
+            <text class="record-title delete-title">删除</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('A')">
+          <div class="record-head">
+            <text class="record-title">A</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('B')">
+          <div class="record-head">
+            <text class="record-title">B</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('C')">
+          <div class="record-head">
+            <text class="record-title">C</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('D')">
+          <div class="record-head">
+            <text class="record-title">D</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('E')">
+          <div class="record-head">
+            <text class="record-title">E</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('F')">
+          <div class="record-head">
+            <text class="record-title">F</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('G')">
+          <div class="record-head">
+            <text class="record-title">G</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('H')">
+          <div class="record-head">
+            <text class="record-title">H</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('I')">
+          <div class="record-head">
+            <text class="record-title">I</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('J')">
+          <div class="record-head">
+            <text class="record-title">J</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('K')">
+          <div class="record-head">
+            <text class="record-title">K</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('L')">
+          <div class="record-head">
+            <text class="record-title">L</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('M')">
+          <div class="record-head">
+            <text class="record-title">M</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('N')">
+          <div class="record-head">
+            <text class="record-title">N</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('O')">
+          <div class="record-head">
+            <text class="record-title">O</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('P')">
+          <div class="record-head">
+            <text class="record-title">P</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('Q')">
+          <div class="record-head">
+            <text class="record-title">Q</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('R')">
+          <div class="record-head">
+            <text class="record-title">R</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('S')">
+          <div class="record-head">
+            <text class="record-title">S</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('T')">
+          <div class="record-head">
+            <text class="record-title">T</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('U')">
+          <div class="record-head">
+            <text class="record-title">U</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('V')">
+          <div class="record-head">
+            <text class="record-title">V</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('W')">
+          <div class="record-head">
+            <text class="record-title">W</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('X')">
+          <div class="record-head">
+            <text class="record-title">X</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('Y')">
+          <div class="record-head">
+            <text class="record-title">Y</text>
+          </div>
+        </div>
+      </list-item>
+      <list-item type="filterRow" style="width: {{cardWidth}}px; height: 90px;">
+        <div class="record-card" @click="onLetterTap('Z')">
+          <div class="record-head">
+            <text class="record-title">Z</text>
+          </div>
+        </div>
+      </list-item>
+    </list>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import storage from "@system.storage"
+
+export default {
+  protected: {
+    currentFilter: "",
+    mode: "",
+    queryParam: ""
+  },
+
+  private: {
+    cardWidth: 188,
+    touchStartX: -1,
+    touchStartY: -1,
+    inputText: "",
+    screenProfile: "pill-standard"
+  },
+
+  onInit() {
+    const sw = this.$app.$def.data.screenWidth || 212
+    if (sw === 466) {
+      this.cardWidth = Math.round(sw / Math.SQRT2)
+    } else {
+      this.cardWidth = sw - 20
+    }
+    this.screenProfile = this.$app.$def.data.screenProfile || "pill-standard"
+    if (this.mode === "input") {
+      this.inputText = this.queryParam || ""
+    }
+  },
+
+  selectFilter(value) {
+    router.replace({
+      uri: "/pages/records",
+      params: {
+        type: "favorites",
+        filterLetter: value
+      }
+    })
+  },
+
+  appendLetter(letter) {
+    this.inputText += letter
+    storage.set({
+      key: "dic_large_input",
+      value: this.inputText
+    })
+  },
+
+  deleteChar() {
+    if (this.inputText.length > 0) {
+      this.inputText = this.inputText.slice(0, -1)
+      storage.set({
+        key: "dic_large_input",
+        value: this.inputText
+      })
+    }
+  },
+
+  onLetterTap(letter) {
+    if (this.mode === "input") {
+      this.appendLetter(letter.toLowerCase())
+    } else {
+      this.selectFilter(letter)
+    }
+  },
+
+  goBack() {
+    if (this.mode === "input") {
+      storage.set({
+        key: "dic_large_input",
+        value: ""
+      })
+      router.replace({
+        uri: "/pages/search",
+        params: {
+          queryParam: this.inputText
+        }
+      })
+    } else {
+      router.back()
+    }
+  },
+
+  onTouchStart(evt) {
+    const point = this.getTouchPoint(evt)
+    if (point) {
+      this.touchStartX = point.clientX
+      this.touchStartY = point.clientY
+    }
+  },
+
+  onTouchEnd(evt) {
+    const point = this.getTouchPoint(evt)
+    if (!point || this.touchStartX < 0) {
+      return
+    }
+    const endX = point.clientX
+    const endY = point.clientY
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
+    const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
+    if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
+      router.back()
+    }
+    this.touchStartX = -1
+    this.touchStartY = -1
+  },
+
+  getTouchPoint(evt) {
+    if (evt && evt.changedTouches && evt.changedTouches.length > 0) {
+      return evt.changedTouches[0]
+    }
+    if (evt && evt.touches && evt.touches.length > 0) {
+      return evt.touches[0]
+    }
+    return null
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 100%;
+  height: 100%;
+  padding-top: 8px;
+  background-color: #020813;
+  flex-direction: column;
+  align-items: center;
+}
+
+.back-button {
+  width: 78px;
+  height: 54px;
+  margin-bottom: 8px;
+  border-radius: 22px;
+  background-color: #0b65ea;
+  justify-content: center;
+  align-items: center;
+}
+
+.back-text {
+  width: 70px;
+  height: 30px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.filter-list {
+  height: 430px;
+  margin-bottom: 4px;
+}
+
+.filter-list-input {
+  height: 330px;
+  margin-bottom: 4px;
+}
+
+.input-row {
+  height: 52px;
+  margin-top: 6px;
+  margin-bottom: 8px;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-width: 2px;
+  border-color: #2f8cff;
+  border-radius: 18px;
+  background-color: #08172b;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.input-text {
+  width: 100%;
+  height: 36px;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.input-text-rect {
+  font-size: 22px;
+}
+
+.record-card {
+  width: 100%;
+  height: 80px;
+  margin-bottom: 10px;
+  border-radius: 20px;
+  background-color: #242424;
+  justify-content: center;
+  align-items: center;
+}
+
+.record-head {
+  width: 100%;
+  height: 38px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.record-title {
+  height: 38px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.delete-card {
+  width: 100%;
+  height: 80px;
+  margin-bottom: 10px;
+  border-radius: 20px;
+  background-color: #c0392b;
+  justify-content: center;
+  align-items: center;
+}
+
+.delete-title {
+  color: #ffffff;
+}
+</style>

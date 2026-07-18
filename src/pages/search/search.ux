@@ -7,7 +7,7 @@
       <text class="back-text" if="{{ !query }}">返回</text>
     </div>
 
-    <div class="input-box input-box-{{screenProfile}}" @click="toggleKeyboard">
+    <div class="input-box input-box-{{screenProfile}}" @click="onInputBoxClick">
       <!-- 常驻 marquee，短时静态、超长时从右向左平滑滚动 -->
       <marquee id="marquee-text" class="input-text input-text-{{screenProfile}}"
         scrollamount="{{marqueeSpeed}}" direction="left" loop="-1" text-offset="40">
@@ -19,6 +19,10 @@
       <input class="edit-button side-button" type="button" value="左" @click="moveLeft" />
       <input class="edit-button clear-button" type="button" value="清空" @click="clearText" />
       <input class="edit-button side-button" type="button" value="右" @click="moveRight" />
+    </div>
+
+    <div if="{{ keyboardHidden }}" class="hint-area">
+      <text class="hint-text">清空即可退出</text>
     </div>
 
     <input-method
@@ -98,6 +102,7 @@ export default {
     englishSuggestionPending: null,
     englishSuggestionToken: 0,
     _suggestionTimer: null,
+    tapTimes: [],
     marqueeActive: false,
     marqueeSpeed: 40
   },
@@ -215,6 +220,21 @@ export default {
   toggleKeyboard() {
     this.keyboardHidden = !this.keyboardHidden
     this.refreshDisplay()
+  },
+
+  onInputBoxClick() {
+    var now = Date.now()
+    this.tapTimes.push(now)
+    this.tapTimes = this.tapTimes.filter(function(t) { return now - t <= 1500 })
+    if (this.tapTimes.length >= 3) {
+      this.tapTimes = []
+      router.replace({
+        uri: "/pages/filter",
+        params: { mode: "input", queryParam: this.query }
+      })
+      return
+    }
+    this.toggleKeyboard()
   },
 
   onVisibilityChange(evt) {
@@ -799,6 +819,20 @@ export default {
 
 .input-text-circle {
   font-size: 22px;
+}
+
+.hint-area {
+  width: 100%;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+}
+
+.hint-text {
+  color: #ffffff;
+  font-size: 18px;
+  text-align: center;
+  height: 24px;
 }
 
 .page-circle {

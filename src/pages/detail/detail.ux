@@ -289,14 +289,18 @@ export default {
       const oldItem = list[i]
       if (oldItem && this.normalizeWord(oldItem.word) === word) {
         existed = true
-      } else if (oldItem && output.length < 20) {
+      } else if (oldItem && output.length < 150) {
         output.push(oldItem)
       }
     }
 
     if (!existed) {
+      if (output.length >= 150) {
+        this.showToast("收藏已达上限（150）")
+        return
+      }
       output.unshift(item)
-      while (output.length > 20) {
+      while (output.length > 150) {
         output.pop()
       }
       this.favoriteLabel = "已收藏"

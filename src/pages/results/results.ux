@@ -142,7 +142,8 @@ export default {
     searchPage: 0,
     collectedIds: [],
     totalResultCount: 0,
-    mightHaveMore: false
+    mightHaveMore: false,
+    wrapCache: null
   },
 
   _expandTag(s) {
@@ -184,9 +185,10 @@ export default {
   },
 
   onInit() {
-    this.fileCache = new LRUCache(5)
-    this.entryCache = new LRUCache(3)
-    this.cnIndexCache = new LRUCache(10)
+    this.fileCache = new LRUCache(20)
+    this.entryCache = new LRUCache(10)
+    this.cnIndexCache = new LRUCache(20)
+    this.wrapCache = {}
     // Force-reset result state — Vela may reuse page instance without re-init
     this.resultCards = []
     this.statusText = ""
@@ -276,6 +278,9 @@ export default {
       this._stopFlushTimer()
       this.resultCards = []
       this.statusText = ""
+      this.pendingCards = []
+      this.collectedIds = []
+      this.totalResultCount = 0
       return
     }
 
@@ -283,11 +288,10 @@ export default {
     this.searchToken = token
     this.resultCards = []
     this.pendingCards = []
-    this.statusText = "搜索中"
-    this.searchPage = 0
     this.collectedIds = []
     this.totalResultCount = 0
     this.mightHaveMore = false
+    this.statusText = "搜索中"
     this._startFlushTimer()
 
     var self = this
@@ -721,12 +725,11 @@ export default {
             continue
           }
           previousWord = word
-          var tag = this._expandTag(parts[3] || "")
           entries[entryId] = {
             word: word,
             phonetic: parts[1] || "",
             translation: parts[2] || "",
-            tag: tag
+            tag: parts[3] || ""
           }
         }
       }
@@ -1283,7 +1286,7 @@ export default {
   },
 
   _enqueueCard(card) {
-    if (this.pendingCards.length >= 200) {
+    if (this.pendingCards.length >= 20) {
       return
     }
     this.pendingCards.push(card)
@@ -1619,7 +1622,17 @@ export default {
     // Ensure tag is expanded — defense against raw hex bitmask reaching display layer
     tag = this._expandTag(tag || "")
     const maxW = this.contentWidth
-    const lines = this.wrapText(translation || "", maxW)
+    const cacheKey = translation + "|" + maxW
+    var lines = this.wrapCache[cacheKey]
+    if (!lines) {
+      lines = this.wrapText(translation || "", maxW)
+      if (this.wrapCache) {
+        if (Object.keys(this.wrapCache).length >= 50) {
+          this.wrapCache = {}
+        }
+        this.wrapCache[cacheKey] = lines
+      }
+    }
     const safeLines = lines.length > 0 ? lines : [""]
     const lineHeight = 22
     const cardHeight = Math.max(100, 64 + safeLines.length * lineHeight)
@@ -1802,6 +1815,7 @@ export default {
     this.fileCache = null
     this.entryCache = null
     this.cnIndexCache = null
+    this.wrapCache = null
   },
 
   hasChinese(value) {

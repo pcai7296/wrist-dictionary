@@ -9,9 +9,11 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/版本-2.2.0-1d74e8?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/平台-Mi%20Band-1d74e8?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/框架-Vela%20QuickApp-1d74e8?style=flat-square" alt="Framework" />
   <img src="https://img.shields.io/badge/词库-14k%2B-2ea043?style=flat-square" alt="Headwords" />
+  <img src="https://img.shields.io/badge/屏幕-多屏适配-ff6b35?style=flat-square" alt="Screens" />
   <img src="https://img.shields.io/badge/输入-英文-1d74e8?style=flat-square" alt="Languages" />
   <img src="https://img.shields.io/badge/工具-aiot--toolkit-ff6b35?style=flat-square" alt="Build" />
 </p>
@@ -22,18 +24,20 @@
 
 **腕上词典** 是一款运行在小米手环上的 Vela 快应用，把一部完整的英汉词典装进手腕。查英语单词、汉字、动词变形——全程离线，抬手即用。
 
-基于小米 `aiot-toolkit` 开发，内置 **14,942 条词汇**（数据源：ECDICT + BNC/COCA 词族），全部压缩在 212×520 像素的手环屏幕中。
+基于小米 `aiot-toolkit` 开发，内置 **14,942 条词汇**（数据源：ECDICT + BNC/COCA 词族），全面适配胶囊屏、iWatch 屏和 466 圆屏。
 
 ---
 
 ## 功能
 
 - **🔍 三种查词模式** — 英语精确/前缀匹配、汉字查词、动词/形容词变形反查
-- **⌨️ 完整输入法** — 全键盘英文输入，支持光标编辑和自动补全
+- **⌨️ 完整输入法** — 全键盘英文输入，支持光标编辑、自动补全，三击搜索框展开大键盘
 - **✨ 智能补全** — 按字母分桶的英语建议列表，标注考试等级（中考/高考/CET-4/CET-6/考研/TOEFL/IELTS/GRE）
 - **🌀 模糊搜索** — 基于编辑距离的容错匹配（最多 2 个差异），输错也能找到
 - **📖 变形查词** — 输入 `ran` → 找到 "run"，输入 `better` → 找到 "good"
-- **❤️ 收藏与历史** — 最多保存 20 条收藏和 20 条搜索历史
+- **❤️ 收藏与历史** — 收藏容量 150 条，支持 A-Z 字母分类筛选，分页加载
+- **📄 分页结果** — 搜索结果分页展示 + 动态增量渲染，翻页自动滚屏
+- **📱 多屏适配** — 胶囊屏 / iWatch 屏 / 466 圆屏，每个页面按屏幕布局自适应排版
 - **🌙 深色主题** — 深蓝底色 `#020813` + 蓝色强调 `#1d74e8`，暗光下不刺眼
 - **📦 纯离线** — 词典数据内置于应用，无需网络
 
@@ -129,7 +133,7 @@ scripts/
 
 > **14,942 条词汇**，源自 ECDICT + BNC/COCA 词族频率数据。
 
-不再打包 `index_en.txt` 或 `english_suggestions.js/.json`。2026-07-15 的实际构建测得：RPK 2.770 MiB，逻辑解包 5.561 MiB，其中词典 5.190 MiB；详见 `.omo/start-work/artifacts/dictionary-size-compaction/integration.txt`。
+不再打包 `index_en.txt` 或 `english_suggestions.js/.json`。compact-v3 优化后 RPK 约 2.8 MiB。
 
 ### 重新生成词典
 
@@ -152,7 +156,7 @@ python scripts/generate_watch_dict.py
 | **框架** | Xiaomi Vela QuickApp (`.ux` SFC) |
 | **工具链** | `aiot-toolkit` v2.0.5 / `rspack` v1.7.12 |
 | **运行时** | Vela JS Engine（JSC 字节码） |
-| **屏幕** | 212×520px, `designWidth: device-width` |
+| **屏幕** | 胶囊屏 / iWatch 屏 / 466 圆屏三端适配，`designWidth: device-width` |
 | **存储** | `@system.storage`（JSON） |
 | **路由** | `@system.router`（7 页面） |
 | **代码检查** | ESLint + Prettier + Stylelint |
@@ -167,6 +171,19 @@ python scripts/generate_watch_dict.py
 - 行宽 100 · 2 空格缩进
 - 约定式提交：`feat:`、`fix:`、`style:`、`refactor:`、`docs:` 等
 - 禁止 `as any` / `@ts-ignore` / 空 catch 块
+
+---
+
+## 版本历史
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
+
+| 版本 | 日期 | 亮点 |
+|------|------|------|
+| **2.2.0** | 2026-07-18 | 收藏重构（150条+A-Z分类）、大键盘输入、结果分页 |
+| **2.1.0** | 2026-07-17 | 多屏适配完成、compact-v3 词典、详情页增强 |
+| **2.0.0** | 2026-07-14 | 词典体积压缩 ~60%、多屏布局适配 |
+| **1.0.0** | 2026-07-08 | 初始发布：查词、输入法、收藏历史 |
 
 ---
 

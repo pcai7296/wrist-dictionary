@@ -8,7 +8,7 @@
       <list-item type="card" class="list-item" style="width: {{layoutWidth}}px; height: 250px;">
         <div class="app-card">
           <text class="app-name">腕上词典</text>
-          <text class="app-version">2.1.0</text>
+          <text class="app-version">2.2.0</text>
           <img class="deco-icon-about" src="/common/deco-icon-about.png" />
         </div>
       </list-item>
@@ -70,7 +70,7 @@ export default {
     touchStartY: -1,
     layoutWidth: 196,
     textWidth: 180,
-    usageHeight: 520,
+    usageHeight: 420,
     licenseHeight: 110,
     limitsHeight: 340,
     tagsHeight: 320,
@@ -126,6 +126,7 @@ export default {
     this.limitLines = this.wrapSectionLines([
       "• 约 1.5 万英文词、12.2 万中文词组",
       "• 每次最多显示 20 条，模糊候选最多 80 条",
+      "• 收藏上限 150 条，历史缓存 20 条",
       "• 中文支持词组和单字检索，长句可能缺失",
       "• 数据完全离线，首次读取分片时请稍候"
     ], this.textWidth)
@@ -174,11 +175,12 @@ export default {
 
   wrapUsageText(maxWidth) {
     const items = [
-      "1. 查变形：输入词根，查看词形变化",
-      "2. 中英查找：输入英文或中文，查看释义",
-      "3. 点结果卡片：打开完整释义",
-      "4. 详情页：收藏词条，稍后复习",
-      "5. 历史记录：查看最近搜索"
+      "1. 查词：输入英文或中文，支持词形变化检索",
+      "2. 大号输入：连点 3 次搜索框，切换大号键盘",
+      "3. 结果卡片：点击查看完整释义",
+      "4. 详情页：收藏词条，上限 150 条",
+      "5. 收藏管理：字母筛选、分页浏览",
+      "6. 历史记录：自动缓存最近 20 条"
     ]
     const lines = []
     for (let i = 0; i < items.length; i++) {

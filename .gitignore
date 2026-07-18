@@ -11,3 +11,6 @@
 /.tmp/
 /opencode.json.bak*
 .opencode/mcp.json
+/fork_astrobox/
+/scripts/__pycache__/
+*.pyc

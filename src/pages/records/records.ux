@@ -4,7 +4,7 @@
       <text class="back-text">返回</text>
     </div>
 
-    <list class="record-list" if="{{ recordItems.length > 0 }}" style="width: {{cardWidth}}px;">
+    <list id="record-list" class="record-list" if="{{ recordItems.length > 0 }}" style="width: {{cardWidth}}px; height: {{listHeight}}px;">
       <list-item
         class="record-item"
         type="recordCard"
@@ -14,6 +14,12 @@
       >
         <div if="{{ item.recordKind === 'clear-history' }}" class="clear-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="clearHistory">
           <text class="clear-text">清空历史记录</text>
+        </div>
+        <div elif="{{ item.recordKind === 'next-page' }}" class="next-button" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="_goToNextPage">
+          <text class="next-text">下一页</text>
+        </div>
+        <div elif="{{ item.recordKind === 'prev-page' }}" class="next-button" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="_goToPrevPage">
+          <text class="next-text">上一页</text>
         </div>
         <div else class="record-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openRecord(item)">
           <div class="record-head">
@@ -35,6 +41,15 @@
     </list>
 
     <text class="empty-text" if="{{ recordItems.length == 0 }}">{{ emptyText }}</text>
+
+    <!-- 弹性撑开 → 筛选按钮贴底 -->
+    <div if="{{ type === 'favorites' }}" style="flex: 1;"></div>
+
+    <!-- 筛选按钮（仅收藏页） -->
+    <div if="{{ type === 'favorites' }}" class="filter-btn" @click="openFilterPage">
+      <text if="{{ activeFilter === '全部' }}" class="filter-btn-text">筛选</text>
+      <text if="{{ activeFilter !== '全部' }}" class="filter-btn-text">筛选 · {{ activeFilter }}</text>
+    </div>
   </div>
 </template>
 
@@ -44,7 +59,8 @@ import storage from "@system.storage"
 
 export default {
   protected: {
-    type: ""
+    type: "",
+    filterLetter: ""
   },
 
   private: {
@@ -57,7 +73,12 @@ export default {
     contentWidth: 164,
     screenWidth: 0,
     wordMarqueeThreshold: 10,
-    marqueeArmed: false
+    marqueeArmed: false,
+    activeFilter: "全部",
+    listHeight: 388,
+    allRecords: [],
+    searchPage: 0,
+    totalRecordCount: 0
   },
 
   onInit() {
@@ -71,7 +92,20 @@ export default {
     }
     this.contentWidth = this.cardWidth - 24
     this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
+    this.listHeight = this.type === "favorites" ? 370 : 388
+    if (this.type === "favorites" && this.filterLetter) {
+      this.activeFilter = this.filterLetter
+    }
     this.loadRecords()
+  },
+
+  openFilterPage() {
+    router.replace({
+      uri: "/pages/filter",
+      params: {
+        currentFilter: this.activeFilter
+      }
+    })
   },
 
   onDestroy() {
@@ -144,13 +178,116 @@ export default {
       key: key,
       success: (data) => {
         if (this.destroyed) return
-        this.recordItems = this.buildRecords(this.parseList(data))
+        let list = this.parseList(data)
+        if (this.type === "favorites") {
+          if (this.activeFilter !== "全部") {
+            // 按首字母筛选
+            const letter = this.activeFilter.toLowerCase()
+            list = list.filter((item) => {
+              return (item.word || "").toLowerCase().charAt(0) === letter
+            })
+            // 筛选后按字母排序 A→Z
+            list.sort((a, b) => {
+              const wa = (a.word || "").toLowerCase()
+              const wb = (b.word || "").toLowerCase()
+              if (wa < wb) return -1
+              if (wa > wb) return 1
+              return 0
+            })
+          }
+          // 未筛选时保持自然顺序（最新添加的在最前）
+          // 更新空文本
+          if (list.length === 0 && this.activeFilter !== "全部") {
+            this.emptyText = '"' + this.activeFilter + '" 暂无收藏'
+          }
+        }
+        this.allRecords = this.buildRecords(list)
+        this.totalRecordCount = this.allRecords.length
+        this.searchPage = 0
+        this._buildPageView()
       },
       fail: () => {
         if (this.destroyed) return
+        this.allRecords = []
+        this.totalRecordCount = 0
+        this.searchPage = 0
         this.recordItems = []
       }
     })
+  },
+
+  _buildPageView() {
+    var pageSize = 20
+    var start = this.searchPage * pageSize
+    var end = Math.min(start + pageSize, this.totalRecordCount)
+    var pageCards = []
+
+    // 上一页按钮
+    if (this.searchPage > 0) {
+      pageCards.push({
+        id: "prev_page",
+        recordKind: "prev-page",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+    }
+
+    // 本页卡片
+    for (var i = start; i < end; i++) {
+      pageCards.push(this.allRecords[i])
+    }
+
+    // 下一页按钮
+    if (end < this.totalRecordCount) {
+      pageCards.push({
+        id: "next_page",
+        recordKind: "next-page",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+    }
+
+    // 历史记录清空按钮（仅最后一页）
+    if (this.type === "history" && end >= this.totalRecordCount && this.totalRecordCount > 0) {
+      pageCards.push({
+        id: "clear_history",
+        recordKind: "clear-history",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+    }
+
+    this.recordItems = pageCards
+  },
+
+  _goToNextPage() {
+    this.searchPage++
+    this._buildPageView()
+    var self = this
+    setTimeout(function() {
+      var list = self.$element("record-list")
+      if (list && list.scrollTo) {
+        list.scrollTo({index: 0})
+      }
+    }, 100)
+  },
+
+  _goToPrevPage() {
+    this.searchPage--
+    this._buildPageView()
+    var self = this
+    setTimeout(function() {
+      var list = self.$element("record-list")
+      if (list && list.scrollTo) {
+        list.scrollTo({index: self.recordItems.length - 1})
+      }
+    }, 300)
   },
 
   openRecord(item) {
@@ -193,7 +330,7 @@ export default {
 
   buildRecords(list) {
     const output = []
-    for (let i = 0; i < list.length && output.length < 20; i++) {
+    for (let i = 0; i < list.length; i++) {
       const item = list[i]
       if (!item) {
         continue
@@ -254,16 +391,6 @@ export default {
         itemHeight: cardHeight + 10,
         wordMarqueeOn: wordMarqueeOn,
         wordMarqueeSpeed: wordMarqueeSpeed
-      })
-    }
-    if (this.type === "history" && output.length > 0) {
-      output.push({
-        id: "clear_history",
-        recordKind: "clear-history",
-        cardHeight: 56,
-        itemHeight: 66,
-        wordMarqueeOn: false,
-        wordMarqueeSpeed: 40
       })
     }
     return output
@@ -460,7 +587,6 @@ export default {
 }
 
 .record-list {
-  height: 388px;
   margin-bottom: 4px;
 }
 
@@ -487,6 +613,20 @@ export default {
 }
 
 .clear-text {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.next-button {
+  height: 56px;
+  border-radius: 20px;
+  background-color: #0b65ea;
+  justify-content: center;
+  align-items: center;
+}
+
+.next-text {
   color: #ffffff;
   font-size: 22px;
   font-weight: 800;
@@ -541,6 +681,25 @@ export default {
   margin-top: 120px;
   color: #aeb0b4;
   font-size: 22px;
+  text-align: center;
+}
+
+.filter-btn {
+  width: 100px;
+  height: 38px;
+  margin-bottom: 30px;
+  border-radius: 22px;
+  background-color: #0b65ea;
+  justify-content: center;
+  align-items: center;
+}
+
+.filter-btn-text {
+  width: 90px;
+  height: 28px;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
   text-align: center;
 }
 </style>
