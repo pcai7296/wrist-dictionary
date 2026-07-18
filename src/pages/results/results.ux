@@ -205,10 +205,7 @@ export default {
       this.applyQueryMarquee(currentQuery)
       this.performSearch()
     }
-    // 1.5s 让人先看清单词，再齐步启动所有跑马灯
-    setTimeout(() => {
-      this.marqueeArmed = true
-    }, 1500)
+    // marquee 在搜索完成后通过 _finishWithMarquee 启动
   },
 
   resolveWordMarqueeThreshold(sw) {
@@ -289,6 +286,7 @@ export default {
         }
         this._flushResults()
         this._stopFlushTimer()
+        this.marqueeArmed = true
         if (this.resultCards.length > 0) {
           this.statusText = this.resultCards.length >= 20 ? "最多显示20条" : ""
         } else {
@@ -340,6 +338,7 @@ export default {
         }
         this._flushResults()
         this._stopFlushTimer()
+        this.marqueeArmed = true
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
         } else if (this.resultCards.length >= 20) {
@@ -353,6 +352,7 @@ export default {
 
     this._flushResults()
     this._stopFlushTimer()
+    this.marqueeArmed = true
     if (this.resultCards.length === 0) {
       this.statusText = "未找到"
     } else if (this.resultCards.length >= 20) {
@@ -384,6 +384,7 @@ export default {
 
         this._flushResults()
         this._stopFlushTimer()
+        this.marqueeArmed = true
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
         } else if (this.resultCards.length >= 20) {
