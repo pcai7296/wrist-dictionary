@@ -278,13 +278,12 @@ export default {
         this.performChineseSearch(normalized, token)
         return
       }
-      this.collectCn2EnResults(normalized, [], {}, (cnResults) => {
+      this.collectCn2EnResults(normalized, [], {}, () => {
         if (token !== this.searchToken) {
           return
         }
-        if (cnResults.length > 0) {
-          this.resultCards = cnResults.slice(0, 20)
-          this.statusText = cnResults.length >= 20 ? "最多显示20条" : ""
+        if (this.resultCards.length > 0) {
+          this.statusText = this.resultCards.length >= 20 ? "最多显示20条" : ""
         } else {
           this.performChineseSearch(normalized, token)
         }
@@ -306,7 +305,7 @@ export default {
             return
           }
 
-          this.finishEnglishSearch(normalized, token, results)
+          this.finishEnglishSearch(normalized, token)
         })
       } else {
         const shards = this.getCandidateShards(normalized)
@@ -317,25 +316,24 @@ export default {
               return
             }
 
-            this.finishEnglishSearch(normalized, token, results)
+            this.finishEnglishSearch(normalized, token)
           })
         })
       }
     })
   },
 
-  finishEnglishSearch(query, token, results) {
-    if (results.length === 0 && query.length > 2 && this.searchMode !== "inflect" && this.isEnglishWord(query)) {
+  finishEnglishSearch(query, token) {
+    if (this.resultCards.length === 0 && query.length > 2 && this.searchMode !== "inflect" && this.isEnglishWord(query)) {
       this.showToast("未找到，混淆搜索")
       this.statusText = "深度搜索"
-      this.collectFuzzyResults(query, (cards) => {
+      this.collectFuzzyResults(query, () => {
         if (token !== this.searchToken) {
           return
         }
-        this.resultCards = cards.slice(0, 20)
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
-        } else if (cards.length >= 20) {
+        } else if (this.resultCards.length >= 20) {
           this.statusText = "相近结果20条"
         } else {
           this.statusText = "相近结果"
@@ -344,10 +342,9 @@ export default {
       return
     }
 
-    this.resultCards = results.slice(0, 20)
     if (this.resultCards.length === 0) {
       this.statusText = "未找到"
-    } else if (results.length >= 20) {
+    } else if (this.resultCards.length >= 20) {
       this.statusText = "最多显示20条"
     } else {
       this.statusText = ""
@@ -374,10 +371,9 @@ export default {
           return
         }
 
-        this.resultCards = results.slice(0, 20)
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
-        } else if (results.length >= 20) {
+        } else if (this.resultCards.length >= 20) {
           this.statusText = "最多显示20条"
         } else {
           this.statusText = ""
@@ -408,7 +404,7 @@ export default {
   },
 
   collectChineseResults(ids, query, results, seen, index, done) {
-    if (index >= ids.length || results.length >= 20) {
+    if (index >= ids.length || this.resultCards.length >= 20) {
       done()
       return
     }
@@ -422,7 +418,7 @@ export default {
     const shard = this.entryShardFor(entryId)
     this.loadEntryShard(shard, (entries) => {
       let nextIndex = index
-      while (nextIndex < ids.length && results.length < 20) {
+      while (nextIndex < ids.length && this.resultCards.length < 20) {
         const nextId = this.parseEntryId(ids[nextIndex])
         if (nextId < 0 || this.entryShardFor(nextId) !== shard) {
           break
@@ -433,9 +429,9 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower] && this.normalizeChineseText(item.translation).indexOf(query) >= 0) {
             seen[lower] = true
-            results.push(
-              this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
-            )
+            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
+            results.push(card)
+            this._emitResult(card)
           }
         }
         nextIndex++
@@ -516,7 +512,7 @@ export default {
   },
 
   fetchEntriesByIds(ids, results, seen, index, done) {
-    if (index >= ids.length || results.length >= 20) {
+    if (index >= ids.length || this.resultCards.length >= 20) {
       done(results)
       return
     }
@@ -530,7 +526,7 @@ export default {
     const shard = this.entryShardFor(entryId)
     this.loadEntryShard(shard, (entries) => {
       let nextIndex = index
-      while (nextIndex < ids.length && results.length < 20) {
+      while (nextIndex < ids.length && this.resultCards.length < 20) {
         const nextId = this.parseEntryId(ids[nextIndex])
         if (nextId < 0 || this.entryShardFor(nextId) !== shard) {
           break
@@ -541,9 +537,9 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower]) {
             seen[lower] = true
-            results.push(
-              this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
-            )
+            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
+            results.push(card)
+            this._emitResult(card)
           }
         }
         nextIndex++
@@ -612,7 +608,7 @@ export default {
   },
 
   collectShardResults(shards, query, results, seen, index, done) {
-    if (index >= shards.length || results.length >= 20) {
+    if (index >= shards.length || this.resultCards.length >= 20) {
       done()
       return
     }
@@ -620,7 +616,7 @@ export default {
     const shard = shards[index]
     this.readText("/common/dict/words/word_" + shard + ".txt", (text) => {
       const candidates = []
-      this.collectCompactWordCandidates(text, query, candidates, seen, "", 20 - results.length)
+      this.collectCompactWordCandidates(text, query, candidates, seen, "", 20 - this.resultCards.length)
       this.hydrateCompactCandidates(candidates, results, 0, () => {
         this.collectShardResults(shards, query, results, seen, index + 1, done)
       })
@@ -628,7 +624,7 @@ export default {
   },
 
   collectInflectResult(query, results, seen, done) {
-    if (results.length >= 20 || query.length < 2) {
+    if (this.resultCards.length >= 20 || query.length < 2) {
       done()
       return
     }
@@ -666,7 +662,7 @@ export default {
   },
 
   collectReverseInflectResult(query, results, seen, done) {
-    if (results.length >= 20) {
+    if (this.resultCards.length >= 20) {
       done()
       return
     }
@@ -710,7 +706,7 @@ export default {
   },
 
   collectFormResults(baseWord, forms, results, seen, index, done) {
-    if (index >= forms.length || results.length >= 20) {
+    if (index >= forms.length || this.resultCards.length >= 20) {
       done()
       return
     }
@@ -724,9 +720,9 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower]) {
             seen[lower] = true
-            results.push(
-              this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
-            )
+            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
+            results.push(card)
+            this._emitResult(card)
           }
         }
         this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
@@ -785,15 +781,15 @@ export default {
             this.loadEntryShard(shard, (entries) => {
               const item = entries[entryId]
               if (item) {
-                results.push(
-                  this.createResultCard(
-                    this.normalizeWord(displayWord),
-                    displayWord,
-                    item.phonetic,
-                    item.translation,
-                    "变形"
-                  )
+                const card = this.createResultCard(
+                  this.normalizeWord(displayWord),
+                  displayWord,
+                  item.phonetic,
+                  item.translation,
+                  "变形"
                 )
+                results.push(card)
+                this._emitResult(card)
               }
               done()
             })
@@ -807,7 +803,7 @@ export default {
   },
 
   collectBaseResults(bases, results, seen, index, done) {
-    if (index >= bases.length || results.length >= 20) {
+    if (index >= bases.length || this.resultCards.length >= 20) {
       done()
       return
     }
@@ -821,9 +817,9 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower]) {
             seen[lower] = true
-            results.push(
-              this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
-            )
+            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
+            results.push(card)
+            this._emitResult(card)
           }
         }
         this.collectBaseResults(bases, results, seen, index + 1, done)
@@ -892,7 +888,7 @@ export default {
   },
 
   hydrateCompactCandidates(candidates, results, index, done) {
-    if (index >= candidates.length || results.length >= 20) {
+    if (index >= candidates.length || this.resultCards.length >= 20) {
       done()
       return
     }
@@ -901,22 +897,22 @@ export default {
     const shard = this.entryShardFor(candidate.entryId)
     this.loadEntryShard(shard, (entries) => {
       let nextIndex = index
-      while (nextIndex < candidates.length && results.length < 20) {
+      while (nextIndex < candidates.length && this.resultCards.length < 20) {
         const next = candidates[nextIndex]
         if (this.entryShardFor(next.entryId) !== shard) {
           break
         }
         const item = entries[next.entryId]
         if (item) {
-          results.push(
-            this.createResultCard(
-              next.lower,
-              item.word || next.word,
-              item.phonetic,
-              item.translation,
-              item.tag || next.tag || next.source
-            )
+          const card = this.createResultCard(
+            next.lower,
+            item.word || next.word,
+            item.phonetic,
+            item.translation,
+            item.tag || next.tag || next.source
           )
+          results.push(card)
+          this._emitResult(card)
         }
         nextIndex++
       }
@@ -955,7 +951,7 @@ export default {
         })
       }
       const cards = []
-      this.hydrateCompactCandidates(candidates, cards, 0, () => done(cards))
+      this.hydrateCompactCandidates(candidates, cards, 0, () => done())
     })
   },
 
@@ -1131,6 +1127,11 @@ export default {
       }
     }
     return best
+  },
+
+  _emitResult(card) {
+    this.resultCards.push(card)
+    this.resultCards = this.resultCards.slice()
   },
 
   createResultCard(id, word, phonetic, translation, tag) {
