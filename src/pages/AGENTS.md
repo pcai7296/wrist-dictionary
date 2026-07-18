@@ -8,13 +8,13 @@
 
 ```
 pages/
-├── index/       # Home — 4 main buttons + about/sponsor links (218 lines)
-├── search/      # IME input + cursor editing + autocomplete (573 lines)
-├── results/     # English/Chinese search results (1114 lines)
-├── detail/      # Word detail + favorite toggle (537 lines, 1s cooldown)
-├── records/     # History/favorites list (type param, 319 lines)
-├── about/       # Credits, license — #000000 bg, text clipping known issue
-└── sponsor/     # Donation QR code (99 lines)
+├── index/       # Home — 4 main buttons + about/sponsor links (318 lines)
+├── search/      # IME input + cursor editing + autocomplete (728 lines)
+├── results/     # English/Chinese search results (1425 lines)
+├── detail/      # Word detail + favorite toggle (661 lines, 1s cooldown)
+├── records/     # History/favorites list (type param, 462 lines)
+├── about/       # Credits, license — #000000 bg, text clipping known issue (367 lines)
+└── sponsor/     # Donation QR code (120 lines)
 ```
 
 ## Where to Look

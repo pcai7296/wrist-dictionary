@@ -6,7 +6,7 @@
 
 ```
 InputMethod/
-├── InputMethod.ux        # ~800 lines: template + script + styles
+├── InputMethod.ux        # ~890 lines: template + script + styles
 ├── AGENTS.md
 └── assets/
     ├── full/             # QWERTY full keys for circle (62-round) screen

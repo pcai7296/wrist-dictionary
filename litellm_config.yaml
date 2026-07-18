@@ -1,0 +1,74 @@
+model_list:
+  - model_name: deepseek-v4-flash-free
+    litellm_params:
+      model: openai/deepseek-v4-flash-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OCC_ZEN_API_KEY
+      rpm: 30
+      tpm: 60000
+      timeout: 60
+      stream_timeout: 30
+    model_info:
+      mode: chat
+      supports_function_calling: false
+
+  - model_name: minimax-m2.5-free
+    litellm_params:
+      model: openai/minimax-m2.5-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OCC_ZEN_API_KEY
+      rpm: 20
+      tpm: 40000
+      timeout: 60
+      stream_timeout: 30
+    model_info:
+      mode: chat
+      supports_function_calling: false
+
+  - model_name: mimo-v2-pro-free
+    litellm_params:
+      model: openai/mimo-v2-pro-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OCC_ZEN_API_KEY
+      rpm: 20
+      tpm: 40000
+      timeout: 60
+      stream_timeout: 30
+    model_info:
+      mode: chat
+      supports_function_calling: false
+
+  - model_name: nemotron-3-super-free
+    litellm_params:
+      model: openai/nemotron-3-super-free
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OCC_ZEN_API_KEY
+      rpm: 15
+      tpm: 30000
+      timeout: 60
+      stream_timeout: 30
+    model_info:
+      mode: chat
+      supports_function_calling: false
+
+  - model_name: big-pickle
+    litellm_params:
+      model: openai/big-pickle
+      api_base: https://opencode.ai/zen/v1
+      api_key: os.environ/OCC_ZEN_API_KEY
+      rpm: 15
+      tpm: 30000
+      timeout: 60
+      stream_timeout: 30
+    model_info:
+      mode: chat
+      supports_function_calling: false
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  telemetry: false
+  num_retries: 2
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

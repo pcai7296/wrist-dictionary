@@ -66,19 +66,19 @@ src/
   pages/                          — 7 pages
     index/                        — Home with 4 buttons
     search/                       — IME + cursor editing + autocomplete
-    results/                      — English/Chinese results (985 lines)
-    detail/                       — Word detail + favorite toggle (505 lines)
+    results/                      — English/Chinese results (1425 lines)
+    detail/                       — Word detail + favorite toggle (661 lines)
     records/                      — History / favorites list (type param)
     about/                        — Credits, license, multi-screen adaptive usage text
     sponsor/                      — Donation QR code
   components/
-    InputMethod/                  — English QWERTY keyboard (852 lines), sub-assets for layouts
+    InputMethod/                  — English QWERTY keyboard (890 lines), sub-assets for layouts
   common/
     dict/                         — Generated shards (gitignored, do NOT edit)
     icons/                        — Button/decoration icons
     i18n/                         — Internationalization files
 scripts/                          — generate_watch_dict.py, deploy_watch.ps1
-omo/                              — 28 Python scripts for asset gen, poster, coverage tests
+omo/                              — 32 Python scripts for asset gen, poster, coverage tests
 data/                             — Source dict CSVs (ecdict_tagged_14942_compact.csv, cedict.txt.gz)
 release_repo/                     — Published RPK + cover.png + preview screenshots
 `

@@ -1,4 +1,4 @@
-# omo/ — Helper Scripts (28 .py)
+# omo/ — Helper Scripts (32 .py)
 
 Asset generation, visual QC, dict coverage tests. **Not loaded by the app** — used by the build/release pipeline and for offline validation.
 
@@ -6,8 +6,8 @@ Asset generation, visual QC, dict coverage tests. **Not loaded by the app** — 
 
 ```
 omo/
-├── gen_poster.py            # Cover image (1800×1200 sky-blue, Mi Band 10 skin)
-├── gen_cover*.py            # Legacy cover variants (1200×800 dark theme, 16:9, etc.)
+├── gen_cover.py → gen_cover_v5s.py  # Cover image variants (1800×1200, 1200×800, 16:9)
+├── gen_poster.py            # Poster generation (poster-qc.md workflow)
 ├── analyze_cccedict.py      # CC-CEDICT coverage/quality analysis
 ├── check_dates.py           # Validate date strings in build artifacts
 ├── check_pr.py              # PR sanity-check helper
@@ -18,13 +18,15 @@ omo/
 ├── measure_text.py          # Text measurement utility
 ├── qc_check.py              # Quality check helper
 ├── verify_pr.py             # PR verification
-├── _gen_*.py                # Asset generation (icons, buttons)
+├── verify_rle.py            # RLE codec verification
+├── _gen_*.py                # Asset generation (icons, buttons, icon-deco)
 ├── _process_icon*.py        # Icon processing pipeline
-├── _check_*.py              # Validation utilities
+├── _check_*.py              # Validation utilities (sizes, WM)
 ├── _miss_analysis.json      # Coverage gap data
 ├── _pos_samples.txt         # Part-of-speech samples
 ├── last_qc_result.txt       # Latest visual QC feedback
-└── yuanbao_python_*.py      # One-shot LLM-generated script (safe to remove)
+├── yuanbao_python_*.py      # One-shot LLM-generated script (safe to remove)
+└── wordnet_derived_test.py  # WordNet-derived inflection test
 ```
 
 ## Common patterns

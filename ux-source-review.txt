@@ -1,5 +1,5 @@
 ﻿Wanshang Honghuang UX Source Review Bundle
-Generated At: 2026-07-10 17:42:49
+Generated At: 2026-07-16 23:30:02
 Project Root: J:\code\MI band\腕上词典
 UX File Count: 9
 
@@ -25,10 +25,69 @@ UX Source
 ################################################################
 
 <script>
+import device from "@system.device"
+
 export default {
+  data: {
+    screenShape: "pill-shaped",
+    screenWidth: 212,
+    screenHeight: 520,
+    screenAspectRatio: 0.408,
+    screenProfile: "pill-standard"
+  },
+
+  updateScreenInfo(data) {
+    const appData = this.data
+    if (data.screenShape) {
+      appData.screenShape = data.screenShape
+    }
+    if (data.screenWidth) {
+      appData.screenWidth = data.screenWidth
+    }
+    if (data.screenHeight) {
+      appData.screenHeight = data.screenHeight
+    }
+    if (appData.screenHeight > 0) {
+      appData.screenAspectRatio =
+        Math.round((appData.screenWidth / appData.screenHeight) * 1000) / 1000
+    }
+
+    if (appData.screenShape === "circle") {
+      appData.screenProfile = "circle"
+    } else if (appData.screenShape === "rect") {
+      appData.screenProfile = "rect"
+    } else if (appData.screenAspectRatio <= 0.4) {
+      appData.screenProfile = "pill-compact"
+    } else {
+      appData.screenProfile = "pill-standard"
+    }
+  },
+
   onCreate() {
     console.log("app created")
+    device.getInfo({
+      success: (data) => {
+        this.updateScreenInfo(data)
+        const appData = this.data
+        console.log(
+          "screen: shape=" +
+            appData.screenShape +
+            " width=" +
+            appData.screenWidth +
+            " height=" +
+            appData.screenHeight +
+            " ratio=" +
+            appData.screenAspectRatio +
+            " profile=" +
+            appData.screenProfile
+        )
+      },
+      fail: (data, code) => {
+        console.log("device.getInfo failed: " + code)
+      }
+    })
   },
+
   onDestroy() {
     console.log("app destroyed")
   }
@@ -55,11 +114,36 @@ export default {
           <div style="position: absolute;top:-4px;left:78px;width:324px;" show="{{downFlag==='' && !numFlag && cval}}">
             <text class="caltext" style="width:296px;"> {{cval}}_ </text>
           </div>
-          <div style="position: absolute;top:38px;left:80px;width:277px" show="{{(lang === 'cn' || lang === 'en') && !numFlag}}">
-            <div class="item column center" for="{{cvalList}}">
-              <input show='{{resultList.length > $idx}}' class="calbtn0" type="button" value="{{resultList[$idx]}}" @click="onRsSelect(resultList[$idx])" />
+          <scroll
+            id="circleChineseCandidates"
+            scroll-x="{{true}}"
+            style="position: absolute;top:38px;left:80px;width:277px;height:52px;"
+            show="{{lang === 'cn' && !numFlag}}"
+          >
+            <div static style="height:52px;flex-direction:row;align-items:center;">
+              <text
+                for="{{cvalList}}"
+                show="{{resultList.length > $idx}}"
+                class="circle-en-candidate"
+                @click="onRsSelect(resultList[$idx])"
+              >{{resultList[$idx]}}</text>
             </div>
-          </div>
+          </scroll>
+          <scroll
+            id="circleEnglishCandidates"
+            scroll-x="{{true}}"
+            style="position: absolute;top:38px;left:80px;width:277px;height:52px;"
+            show="{{lang === 'en' && !numFlag}}"
+          >
+            <div static style="height:52px;flex-direction:row;align-items:center;">
+              <text
+                for="{{cvalList}}"
+                show="{{resultList.length > $idx}}"
+                class="circle-en-candidate"
+                @click="onRsSelect(resultList[$idx])"
+              >{{resultList[$idx]}}</text>
+            </div>
+          </scroll>
           <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
           <list class="list3" if="{{downFlag==='down'}}">
             <list-item type="waitingRows62t9" class="item3" for="{{itemArray in resultList2}}">
@@ -120,11 +204,21 @@ export default {
           <div show="{{downFlag==='' && !numFlag}}" style="position: absolute;top:-4px;left:240px;width:145px;height:40px;justify-content:flex-end">
             <text for="{{waitingList}}" class="waiting-keys" style="color:{{$idx===waitingIndex ? 'rgb(13,132,255)' : 'white'}};" @click="onSelectWaiting($idx)">{{waitingList[$idx]}}</text>
           </div>
-          <div style="position: absolute;top:39px;left:105px;width:233px" show="{{(lang === 'cn' || lang === 'en') && !numFlag}}">
-            <div class="item column center" for="{{cvalList}}">
-              <input show='{{resultList.length > $idx}}' class="calbtn0" type="button" value="{{resultList[$idx]}}" @click="onRsSelect(resultList[$idx])" />
+          <scroll
+            id="circleT9Candidates"
+            scroll-x="{{true}}"
+            style="position: absolute;top:39px;left:105px;width:233px;height:52px;"
+            show="{{(lang === 'cn' || lang === 'en') && !numFlag}}"
+          >
+            <div static style="height:52px;flex-direction:row;align-items:center;">
+              <text
+                for="{{cvalList}}"
+                show="{{resultList.length > $idx}}"
+                class="circle-en-candidate"
+                @click="onRsSelect(resultList[$idx])"
+              >{{resultList[$idx]}}</text>
             </div>
-          </div>
+          </scroll>
           <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
           <list class="list3" if="{{downFlag==='down'}}">
             <list-item type="waitingRows62full" class="item3" for="{{itemArray in resultList2}}">
@@ -231,11 +325,11 @@ export default {
         </div>
         <div style="width: 100%; flex-direction: row; justify-content: center; top:6px; padding:0 6px;">
           <img src="./assets/horizontal/cn.png" style="padding: 6px;width: 60px;height: 60px;" @click="onBtnClick('lang')" if="{{downFlag==='' && !numFlag && lang==='cn'}}" />
-          <div if="{{(lang === 'cn' || lang === 'en') && !numFlag}}" style="margin-left: 6px;flex: 1;height: 60px;background-color:#262626;border-color: #333333; border-width: 3px; border-radius: 100px;flex-direction: row;align-items:center">
-            <scroll id="cvalWaiting" scroll-x="{{true}}" style="position:absolute;width: 85%;height: 42px;">
-              <div static style="position: absolute;left: 0px;height: 42px;padding-left:20px;padding-right:20px">
-                <text class="calbtn02" style="padding-right:10px" @click="pushCval">{{cval}}</text>
-                <text for="{{cvalList}}" show="{{resultList.length > $idx}}" class="calbtn02" style="padding-right:10px" @click="onRsSelect(resultList[$idx])">{{resultList[$idx]}}</text>
+          <div if="{{(lang === 'cn' || lang === 'en') && !numFlag}}" style="margin-left: 6px;flex: 1;height: 60px;background-color:#262626;border-color: #333333; border-width: 3px; border-radius: 100px;flex-direction: row;align-items:center;position:relative;">
+            <scroll id="cvalWaiting" scroll-x="{{true}}" style="position:absolute;width:100%;height:42px;">
+              <div static style="position:absolute;left:20px;height:42px;padding-right:60px;flex-direction:row;align-items:center;">
+                <text class="calbtn02" style="padding-right:10px;flex-shrink:0;" @click="pushCval">{{cval}}</text>
+                <text for="{{cvalList}}" show="{{resultList.length > $idx}}" class="calbtn02" style="padding-right:10px;flex-shrink:0;" @click="onRsSelect(resultList[$idx])">{{resultList[$idx]}}</text>
               </div>
             </scroll>
             <img if="{{resultList.length > 0}}" style="position:absolute;right: 8px; width: 60px;height: 40px;" src="./assets/horizontal/down2.png" @click="onBtnClick('down')" />
@@ -246,23 +340,21 @@ export default {
         </div>
         <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
         <div style="position: absolute;left: 0px;top: 0px;width: 100%;height: 252px;background-color: black; justify-content:center; flex-direction:column; align-items:center" if="{{downFlag==='down'}}">
-          <div static class="list67">
-            <list static style="width:100%;height:100%;">
-              <list-item type="waitingRows67" class="item67" for="{{itemArray in resultList2}}">
-                <div class="item column center" for="{{item in itemArray}}">
-                  <input class="calbtn02" style="width:100%;" type="button" value="{{item}}" @click="onRsSelect(item)" />
-                </div>
-              </list-item>
-            </list>
-          </div>
+          <list static class="list67">
+            <list-item type="waitingRows67" class="item67" for="{{itemArray in resultList2}}">
+              <div class="item column center" for="{{item in itemArray}}">
+                <input class="calbtn02" style="width:100%;" type="button" value="{{item}}" @click="onRsSelect(item)" />
+              </div>
+            </list-item>
+          </list>
           <img static style="margin-top:5px" src="./assets/horizontal/up2.png" @click="onBtnClick('down')" />
         </div>
       </div>
       <!-- 胶囊屏66 -->
       <div if="{{screentype==='pill-shaped'}}" style="width: 100%;height: 305px">
         <div static style="position:absolute;left:0px;top:34px;width:100%;height:276px;">
-          <progress percent="{{30+percent66}}" type="arc" style="start-angle:204deg;total-angle:-48deg;width:188px;height:188px;top:82px;left:2px;position:absolute;color:#ffffff;stroke-width:6px;layer-color:#262626;margin-left: {{(screenWidth - 192)/2}}px;"></progress>
-          <scroll id="keyboard66" scroll-x="{{true}}" onscroll="handelScroll" style="padding-left: {{(screenWidth - 192)/2}}px;padding-right: {{(screenWidth - 192)/2}}px;">
+          <progress percent="{{30+percent66}}" type="arc" style="start-angle:204deg;total-angle:-48deg;width:188px;height:188px;top:82px;left:2px;position:absolute;color:#ffffff;stroke-width:6px;layer-color:#262626;margin-left: {{keyboardLeftOffset}}px;"></progress>
+          <scroll id="keyboard66" scroll-x="{{true}}" onscroll="handelScroll" style="padding-left: {{keyboardLeftOffset}}px;padding-right: {{keyboardLeftOffset}}px;">
             <div if="{{!numFlag}}" style="left: 3px; flex-direction: column;">
               <div static style="margin-left: 0px;margin-top: 0px;height: 60px;">
                 <text class="calbtn66" for="{{item in keys['full'][0]}}" @click="onSelect(item)">{{item}}</text>
@@ -299,7 +391,7 @@ export default {
             </div>
           </scroll>
         </div>
-        <div static style="position: absolute;left: {{(screenWidth - 192)/2}}px;top: 0px;width: 192px;height: 110px;"> 
+        <div static style="position: absolute;left: {{keyboardLeftOffset}}px;top: 0px;width: 192px;height: 110px;"> 
           <img static style="position: absolute;left: 3px;top: 47px;width: 186px;height: 60px;" src="./assets/arc/search.png" />
           <scroll id="cvalWaiting" scroll-x="{{true}}" style="position: absolute;left: 15px;top: 56px;width: 144px;height: 42px;">
             <div style="position: absolute;left: 0px;top: 0px;height: 42px;padding-right:20px">
@@ -314,7 +406,7 @@ export default {
         </div>
         <!-- 这里使用show会导致每次输入都会加载全部候选列表，很卡 -->
         <div style="position: absolute;top: 47px;width: 100%;height: 263px;background-color: black;" if="{{downFlag==='down'}}">
-          <div style="position: absolute;left: {{(screenWidth - 192)/2}}px;width: 192px;height: 263px;"> 
+          <div style="position: absolute;left: {{keyboardLeftOffset}}px;width: 192px;height: 263px;"> 
             <list static class="list66">
               <list-item type="waitingRows66" class="item66" for="{{itemArray in resultList2}}">
                 <div class="item column center" for="{{item in itemArray}}">
@@ -334,6 +426,44 @@ export default {
 import vibrator from "@system.vibrator";
 import device from '@system.device'
 import { SimpleInputMethod } from "./assets/dicUtil.js";
+import {getSuggestionSeed, getSuggestions, onSuggestionsChange} from "../../common/suggestionState"
+const KEY_MAPS = {
+  full: [
+    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+    ["Z", "X", "C", "V", "B", "N", "M"]
+  ],
+  sign: [
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    ["~", "!", "@", "#", "%", "\u201c", "\u201d", "*", "?", "/"],
+    ["(", ")", "-", "_", ":", ";", "\uff0c", "\u3002", "."]
+  ],
+  sign_jp: [
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    ["~", "\u2022", "@", "#", "%", "\u300c", "\u300d", "*", "?", "/"],
+    ["(", ")", "-", "\u2026", ":", ";", "\u3001", "\u3002", "!"]
+  ],
+  sign62: [
+    ["2", "3", "4", "5", "6", "7", "8", "9"],
+    ["!", "@", "#", "%", "\u201c", "\u201d", "*"],
+    [")", "-", "_", ":", ";"]
+  ],
+  sign62_jp: [
+    ["2", "3", "4", "5", "6", "7", "8", "9"],
+    ["\u2022", "@", "#", "%", "\u300c", "\u300d", "*"],
+    [")", "-", "\u2026", ":", ";"]
+  ],
+  full62: [
+    ["W", "E", "R", "T", "Y", "U", "I", "O"],
+    ["S", "D", "F", "G", "H", "J", "K"],
+    ["X", "C", "V", "B", "N"]
+  ],
+  t9: [
+    ["abc", "def"],
+    ["ghi", "jkl", "mno"],
+    ["pqrs", "tuv", "wxyz"]
+  ]
+}
 function doSearchDic(word, lang, cb) {
   if (!word) {
     cb([]);
@@ -361,12 +491,6 @@ export default {
     maxlength: {
       default: 5,
     },
-    englishseed: {
-      default: "",
-    },
-    englishsuggestions: {
-      default: "",
-    },
     vibratemode: {
       default: "",
     },
@@ -391,44 +515,9 @@ export default {
     percent66: 0,
     // 针对screenShape为rect的设备，会自动获取screenWidth并绑定到根div
     // 这样便能同时适配n67和o65甚至是后续设备，但实际效果可能受designWidth影响
-    screenWidth: 336,
-    keys: {
-      full: [
-        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-        ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-        ["Z", "X", "C", "V", "B", "N", "M"],
-      ],
-      sign: [
-        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-        ["~", "!", "@", "#", "%", "“", "”", "*", "?", "/"],
-        ["(", ")", "-", "_", ":", ";", "，", "。", "."],
-      ],
-      sign_jp: [
-        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-        ["~", "•", "@", "#", "%", "「", "」", "*", "?", "/"],
-        ["(", ")", "-", "…", ":", ";", "、", "。", "!"],
-      ],
-      sign62: [
-        ["2", "3", "4", "5", "6", "7", "8", "9"],
-        ["!", "@", "#", "%", "“", "”", "*"],
-        [")", "-", "_", ":", ";"],
-      ],
-      sign62_jp: [
-        ["2", "3", "4", "5", "6", "7", "8", "9"],
-        ["•", "@", "#", "%", "「", "」", "*"],
-        [")", "-", "…", ":", ";"],
-      ],
-      full62: [
-        ["W", "E", "R", "T", "Y", "U", "I", "O"],
-        ["S", "D", "F", "G", "H", "J", "K"],
-        ["X", "C", "V", "B", "N"],
-      ],
-      t9: [
-        ["abc", "def"],
-        ["ghi", "jkl", "mno"],
-        ["pqrs", "tuv", "wxyz"],
-      ],
-    },
+    screenWidth: 212,
+    keyboardLeftOffset: 10, // (212 - 192) / 2, 由 adjustScreenWidth 更新
+    keys: KEY_MAPS,
   },
   onInit() {
     if (this.lang !== "cn" && this.lang !== "en") {
@@ -448,8 +537,17 @@ export default {
     this.$watch("hide", "watchHidePropsChange");
     this.$watch("maxlength", "watchMaxLengthPropsChange");
     this.$watch("keyboardtype", "watchKeyboardTypePropsChange");
-    this.$watch("englishseed", "watchEnglishSeedPropsChange");
-    this.$watch("englishsuggestions", "watchEnglishSuggestionsPropsChange");
+    onSuggestionsChange(function () {
+      if (this.lang === "en") {
+        this.resetReslutList()
+      }
+    }.bind(this))
+  },
+  onDestroy() {
+    this.$unwatch("hide")
+    this.$unwatch("maxlength")
+    this.$unwatch("keyboardtype")
+    onSuggestionsChange(null)
   },
   addAllTxt(txt) {
     this.$emit("complete", { content: txt });
@@ -458,7 +556,7 @@ export default {
     this.onVibrate();
     let content = txt;
     if (this.lang === "en") {
-      const seed = this.normalizeEnglishSeed(this.englishseed);
+      const seed = this.normalizeEnglishSeed(getSuggestionSeed());
       const word = this.normalizeEnglishSeed(txt);
       if (seed && word.indexOf(seed) === 0 && word.length > seed.length) {
         content = word.slice(seed.length);
@@ -579,7 +677,7 @@ export default {
       watingStr = this.lastWaitingStr[this.waitingIndex];
     }
     if (this.lang === "en") {
-      this.getEnglishResults(this.englishseed);
+      this.getEnglishResults(getSuggestionSeed());
       return;
     }
     if (!(this.cval + watingStr) || this.lang !== "cn") {
@@ -618,7 +716,7 @@ export default {
       this.setResultListAll();
       return;
     }
-    this.resultList = this.parseEnglishSuggestions(this.englishsuggestions);
+    this.resultList = this.parseEnglishSuggestions(getSuggestions());
     this.setResultListAll();
   },
   onSelect(num) {
@@ -668,16 +766,6 @@ export default {
       this.resetReslutList();
     }
   },
-  watchEnglishSeedPropsChange(newV, oldV) {
-    if (this.lang === "en" && newV !== oldV) {
-      this.resetReslutList();
-    }
-  },
-  watchEnglishSuggestionsPropsChange(newV, oldV) {
-    if (this.lang === "en" && newV !== oldV) {
-      this.resetReslutList();
-    }
-  },
   onVibrate() {
     if (this.vibratemode != "") {
       vibrator.vibrate({ mode: this.vibratemode });
@@ -721,6 +809,12 @@ export default {
     device.getInfo({
       success: (data) => {
         this.screenWidth = data.screenWidth;
+        this.keyboardLeftOffset = Math.max(0, (data.screenWidth - 192) / 2);
+        this.$emit("ready", {});
+      },
+      fail: () => {
+        this.keyboardLeftOffset = Math.max(0, (this.screenWidth - 192) / 2);
+        this.$emit("ready", {});
       }
     })
   }
@@ -754,6 +848,15 @@ export default {
 	font-size:32px;
 	text-align:center;
 	height:42px;
+}
+.circle-en-candidate {
+	color:rgb(255,255,255);
+	font-size:28px;
+	text-align:center;
+	height:42px;
+	lines:1;
+	text-overflow:ellipsis;
+	padding-right:10px;
 }
 .calbtnfull {
 	color:#fff;
@@ -799,7 +902,8 @@ export default {
 	height:160px;
 	flex-direction:column;
 	background-color:#262626;
-	border-radius:12px
+	border-radius:12px;
+	padding:8px
 }
 .item3 {
 	width:324px;
@@ -838,7 +942,7 @@ export default {
 	border-radius:30px;
 	background-color:#262626;
 	border:3px solid rgba(255,255,255,0.06);
-	padding:0px 10px;
+	padding:8px;
 }
 .item67 {
 	height:50px;
@@ -891,13 +995,6 @@ export default {
   width:unset;
 }
 
-@media (min-width: 230) and (max-width: 235) and (shape: circle) {
-  #full-keyboard {
-    transform:scale(0.96);
-    transform-origin:0 321px;
-    overflow:visible;
-  }
-}
 </style>
 
 
@@ -915,7 +1012,7 @@ export default {
       <list-item type="card" class="list-item" style="height: 250px;">
         <div class="app-card">
           <text class="app-name">腕上词典</text>
-          <text class="app-version">1.0</text>
+          <text class="app-version">2.0</text>
           <img class="deco-icon-about" src="/common/deco-icon-about.png" />
         </div>
       </list-item>
@@ -939,25 +1036,26 @@ export default {
         </div>
       </list-item>
 
-      <list-item type="usage" class="list-item" style="height: 440px;">
+      <list-item type="usage" class="list-item" style="height: 520px;">
         <div class="section-inner">
           <text class="section-title">使用说明</text>
-          <text class="desc-line">1. 首页选"查找变形"输入单词根，查询屈折变化（过去式/复数等）</text>
-          <text class="desc-line">2. 首页选"中英查找"搜索英文或中文，获得释义</text>
-          <text class="desc-line">3. 支持 QWERTY / T9 两种键盘，中/英/日三种输入语言</text>
-          <text class="desc-line">4. 点击结果卡片查看详细释义、音标、变形</text>
-          <text class="desc-line">5. 详情页可添加到收藏，在"我的收藏"中复习</text>
-          <text class="desc-line">6. 搜索历史自动保存于"历史记录"，最多各20条</text>
+          <text class="desc-line">1. 首页→"查找变形"</text>
+          <text class="desc-line" style="margin-top: 0px;">   输入词根查屈折变化</text>
+          <text class="desc-line">2. 首页→"中英查找"</text>
+          <text class="desc-line" style="margin-top: 0px;">   搜英文或中文得释义</text>
+          <text class="desc-line">3. 点击结果卡片看详细释义</text>
+          <text class="desc-line">4. 详情页可添加到收藏复习</text>
+          <text class="desc-line">5. 搜索历史存于"历史记录"</text>
         </div>
       </list-item>
 
       <list-item type="limits" class="list-item" style="height: 340px;">
         <div class="section-inner">
           <text class="section-title">使用限制</text>
-          <text class="desc-line">• 本地词库约15,000词 + 12万中文词组，专业词汇可能未收录</text>
-          <text class="desc-line">• 每次搜索最多20条结果，模糊搜索最多80候补</text>
+          <text class="desc-line">• 约15,000词 + 12万中文词组，专有词可能未收录</text>
+          <text class="desc-line">• 每次搜索最多20条结果，模糊最多80候补</text>
           <text class="desc-line">• 中文搜索需精确匹配，长句效果有限</text>
-          <text class="desc-line">• 首次使用词库加载约数秒，请稍候</text>
+          <text class="desc-line">• 中文搜索耗时较长，请稍候</text>
         </div>
       </list-item>
 
@@ -1022,8 +1120,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 20
-    const endsAtRightQuarter = endX >= 180
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.1
+    const endsAtRightQuarter = endX >= sw * 0.85
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 60
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -1049,7 +1148,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 8px;
   background-color: #000000;
   flex-direction: column;
@@ -1186,18 +1285,26 @@ export default {
       <text class="back-text">返回</text>
     </div>
 
-    <text class="word-text">{{ wordText }}</text>
-    <text class="phonetic-text">{{ phoneticText }}</text>
+    <div class="word-area">
+      <marquee if="{{ wordMarqueeOn }}" class="word-marquee" style="width: {{contentWidth}}px;"
+        scrollamount="{{ wordMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+        {{ wordText }}   {{ wordText }}
+      </marquee>
+      <text if="{{ !wordMarqueeOn }}" class="word-text" style="width: {{contentWidth}}px;">{{ wordText }}</text>
+      <text class="phonetic-text" style="width: {{contentWidth}}px;">{{ phoneticText }}</text>
+    </div>
 
-    <list class="meaning-list">
-      <list-item class="meaning-item" type="meaningLine" for="{{ line in translationLines }}">
-        <text class="meaning-line">{{ line }}</text>
-      </list-item>
-    </list>
+    <div class="content-area">
+      <list class="meaning-list" style="width: {{cardWidth}}px;">
+        <list-item class="meaning-item" type="meaningLine" for="{{ item in displayLines }}">
+          <text class="{{ item.isTag ? 'tag-line' : 'meaning-line' }}">{{ item.text }}</text>
+        </list-item>
+      </list>
+    </div>
 
-    <div class="bottom-row">
-      <input class="bottom-button inflect-button" type="button" value="查变形" @click="goInflect" />
-      <input class="bottom-button favorite-button" type="button" value="{{ favoriteLabel }}" @click="toggleFavorite" />
+    <div class="bottom-row" style="{{ bottomStyle }}">
+      <input class="bottom-button inflect-button" style="{{ inflectBtnStyle }}" type="button" value="查变形" @click="goInflect" />
+      <input class="bottom-button favorite-button" style="{{ favoriteBtnStyle }}" type="button" value="{{ favoriteLabel }}" @click="toggleFavorite" />
     </div>
   </div>
 </template>
@@ -1223,7 +1330,10 @@ export default {
     phoneticText: "",
     translationText: "",
     tagText: "",
+    tagLines: [],
     translationLines: [],
+    cardWidth: 188,
+    contentWidth: 164,
     favoriteLabel: "收藏",
     fileCache: {},
     sourceWord: "",
@@ -1234,23 +1344,80 @@ export default {
     inflectPressCooldown: 1000,
     maxInflectDepth: 3,
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    destroyed: false,
+    wordMarqueeOn: false,
+    wordMarqueeSpeed: 40,
+    wordMarqueeThreshold: 9
   },
 
   onInit() {
+    const sw = this.$app.$def.data.screenWidth || 212
+    this.cardWidth = sw - 20
+    this.contentWidth = this.cardWidth - 24
+    this.isRoundScreen = sw === 466
+    this.isCapsule = sw === 192 || sw === 212
+    if (this.isRoundScreen) {
+      this.bottomStyle = "justify-content: center;"
+      this.inflectBtnStyle = "margin-right: 5px;"
+      this.favoriteBtnStyle = "margin-left: 5px;"
+    } else if (this.isCapsule) {
+      this.bottomStyle = "margin-bottom: 40px;"
+      this.inflectBtnStyle = ""
+      this.favoriteBtnStyle = ""
+    } else {
+      this.bottomStyle = ""
+      this.inflectBtnStyle = ""
+      this.favoriteBtnStyle = ""
+    }
     this.wordText = this.word || ""
     this.phoneticText = this.phonetic ? "/" + this.phonetic + "/" : ""
     this.translationText = this.translation || ""
     this.tagText = this.tag || ""
-    this.translationLines = this.wrapText(this.translationText, 164)
+    this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
+    this.applyWordMarquee(this.wordText)
+    const tagLines = this.tagText ? this.tagText.split(" ") : []
+    const wrapW = this.contentWidth - 24
+    this.translationLines = this.wrapText(this.translationText, wrapW)
     if (this.translationLines.length === 0) {
       this.translationLines = [""]
+    }
+    this.displayLines = []
+    for (let i = 0; i < this.translationLines.length; i++) {
+      this.displayLines.push({ text: this.translationLines[i], isTag: false })
+    }
+    for (let i = 0; i < tagLines.length; i++) {
+      this.displayLines.push({ text: tagLines[i], isTag: true })
     }
     this.refreshFavoriteState()
   },
 
+  onDestroy() {
+    this.destroyed = true
+  },
+
   goBack() {
     router.back()
+  },
+
+  resolveWordMarqueeThreshold(sw) {
+    if (sw === 192) return 8
+    if (sw === 212) return 9
+    if (sw === 336) return 16
+    if (sw === 432) return 20
+    if (sw === 466) return 20
+    return 9
+  },
+
+  applyWordMarquee(text) {
+    if (text && text.length > this.wordMarqueeThreshold) {
+      this.wordMarqueeOn = true
+      const extra = text.length - this.wordMarqueeThreshold
+      this.wordMarqueeSpeed = Math.max(40, Math.min(60, Math.round(40 + extra * 1.5)))
+    } else {
+      this.wordMarqueeOn = false
+      this.wordMarqueeSpeed = 40
+    }
   },
 
   goInflect() {
@@ -1366,6 +1533,7 @@ export default {
     storage.get({
       key: "dic_favorites",
       success: (data) => {
+        if (this.destroyed) return
         const list = this.parseList(data)
         const word = this.normalizeWord(this.wordText)
         this.favoriteLabel = "收藏"
@@ -1377,6 +1545,7 @@ export default {
         }
       },
       fail: () => {
+        if (this.destroyed) return
         this.favoriteLabel = "收藏"
       }
     })
@@ -1402,6 +1571,7 @@ export default {
         return list
       }
     } catch (err) {
+      console.log('[腕上词典] storage data parse failed:', err && err.message)
       return []
     }
     return []
@@ -1518,57 +1688,16 @@ export default {
       uri: uri,
       encoding: "utf-8",
       success: (data) => {
+        if (this.destroyed) return
         const text = data && data.text ? data.text : ""
         this.fileCache[uri] = text
         done(text)
       },
       fail: () => {
+        if (this.destroyed) return
         this.fileCache[uri] = ""
         done("")
       }
-    })
-  },
-
-  scanForwardInflect(text, word) {
-    const lines = text.split("\n")
-    const lowerWord = this.normalizeWord(word)
-    for (let i = 0; i < lines.length; i++) {
-      const parts = lines[i].split("\t")
-      if (parts.length >= 2 && this.normalizeWord(parts[0]) === lowerWord) {
-        return parts[1].split(",").map((s) => s.trim()).filter((s) => s)
-      }
-    }
-    return []
-  },
-
-  scanReverseInflect(text, word) {
-    const lines = text.split("\n")
-    const lowerWord = this.normalizeWord(word)
-    for (let i = 0; i < lines.length; i++) {
-      const parts = lines[i].split("\t")
-      if (parts.length >= 2 && this.normalizeWord(parts[0]) === lowerWord) {
-        return parts[1].split(",").map((s) => s.trim()).filter((s) => s)
-      }
-    }
-    return []
-  },
-
-  loadInflectForms() {
-    const word = this.normalizeWord(this.wordText)
-    if (!word || word.length < 2) {
-      return
-    }
-
-    const shard = this.keyFor(word)
-    const self = this
-
-    this.readText("/common/dict/inflect/inflect_" + shard + ".txt", (text) => {
-      const bases = text ? self.scanForwardInflect(text, word) : []
-      if (bases.length > 0) {
-        self.loadReverseInflectForms(bases[0], word, true)
-        return
-      }
-      self.loadReverseInflectForms(word, word, false)
     })
   },
 
@@ -1604,8 +1733,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -1631,7 +1761,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
@@ -1656,76 +1786,69 @@ export default {
   text-align: center;
 }
 
-.word-text {
-  width: 168px;
-  height: 34px;
+.word-area {
   margin-top: 14px;
+  margin-left: 15px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.word-text,
+.word-marquee {
+  height: 40px;
   color: #ffffff;
-  font-size: 27px;
+  font-size: 32px;
   font-weight: 800;
   text-align: left;
 }
 
+.word-marquee {
+  lines: 1;
+  text-overflow: clip;
+}
+
 .phonetic-text {
-  width: 168px;
-  height: 20px;
+  height: 36px;
   color: #a9c8f6;
-  font-size: 14px;
+  font-size: 28px;
   text-align: left;
 }
 
-.inflect-section {
-  width: 168px;
-  margin-top: 4px;
+.content-area {
+  flex: 1;
   flex-direction: column;
-}
-
-.inflect-row {
-  width: 168px;
-  height: 20px;
-  flex-direction: row;
+  justify-content: center;
   align-items: center;
 }
 
-.inflect-label {
-  color: #a9c8f6;
-  font-size: 13px;
-  height: 20px;
-  margin-right: 4px;
-}
-
-.inflect-link {
-  color: #0b65ea;
-  font-size: 14px;
-  height: 20px;
-  margin-right: 8px;
-}
-
 .meaning-list {
-  width: 188px;
   height: 286px;
   margin-top: 8px;
 }
 
 .meaning-item {
-  width: 188px;
-  height: 24px;
+  height: 32px;
 }
 
 .meaning-line {
-  width: 168px;
-  height: 24px;
+  height: 32px;
   margin-left: 10px;
   color: #e9f2ff;
-  font-size: 18px;
+  font-size: 27px;
   lines: 1;
   text-overflow: clip;
 }
 
+.tag-line {
+  height: 34px;
+  margin-left: 10px;
+  color: #6ba3e8;
+  font-size: 28px;
+}
+
 .bottom-row {
-  width: 176px;
   height: 48px;
-  margin-top: 2px;
+  margin-bottom: 10px;
   flex-direction: row;
   justify-content: space-between;
 }
@@ -1755,36 +1878,41 @@ export default {
 ################################################################
 
 <template>
-  <div class="page">
-    <text class="title">腕上词典</text>
+  <div class="page page-{{screenProfile}}">
+    <text class="title title-{{screenProfile}}">腕上词典</text>
 
-    <div class="icon-card">
-      <img class="deco-icon" src="/common/deco-icon.png" />
-    </div>
-
-    <div class="main-button secondary-button" @click="goInflectSearch">
-      <img class="btn-icon" src="/common/icons/btn_transform.png" />
-      <text class="btn-label">查找变形</text>
-    </div>
-    <div class="main-button secondary-button" @click="goSearch">
-      <img class="btn-icon" src="/common/icons/btn_search.png" />
-      <text class="btn-label">中英查找</text>
-    </div>
-    <div class="main-button secondary-button" @click="goHistory">
-      <img class="btn-icon" src="/common/icons/btn_history.png" />
-      <text class="btn-label">历史记录</text>
-    </div>
-    <div class="main-button secondary-button" @click="goFavorites">
-      <img class="btn-icon" src="/common/icons/btn_fav.png" />
-      <text class="btn-label">我的收藏</text>
+    <div class="icon-card icon-card-{{screenProfile}}">
+      <img class="deco-icon deco-icon-{{screenProfile}}" src="/common/deco-icon.png" />
     </div>
 
-    <div class="bottom-row">
-      <div class="small-button about-button" @click="goAbout">
+    <div class="button-group button-group-{{screenProfile}}">
+      <div
+        class="main-button main-button-{{screenProfile}} secondary-button"
+        @click="goInflectSearch"
+      >
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_transform.png" />
+        <text class="btn-label">查找变形</text>
+      </div>
+      <div class="main-button main-button-{{screenProfile}} secondary-button" @click="goSearch">
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_search.png" />
+        <text class="btn-label">中英查找</text>
+      </div>
+      <div class="main-button main-button-{{screenProfile}} secondary-button" @click="goHistory">
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_history.png" />
+        <text class="btn-label">历史记录</text>
+      </div>
+      <div class="main-button main-button-{{screenProfile}} secondary-button" @click="goFavorites">
+        <img class="btn-icon btn-icon-{{screenProfile}}" src="/common/icons/btn_fav.png" />
+        <text class="btn-label">我的收藏</text>
+      </div>
+    </div>
+
+    <div class="bottom-row bottom-row-{{screenProfile}}">
+      <div class="small-button small-button-{{screenProfile}} about-button" @click="goAbout">
         <img class="btn-icon-sm" src="/common/icons/btn_about.png" />
         <text class="btn-label-sm">关于</text>
       </div>
-      <div class="small-button sponsor-button" @click="goSponsor">
+      <div class="small-button small-button-{{screenProfile}} sponsor-button" @click="goSponsor">
         <img class="btn-icon-sm" src="/common/icons/btn_sponsor.png" />
         <text class="btn-label-sm">赞助</text>
       </div>
@@ -1793,9 +1921,28 @@ export default {
 </template>
 
 <script>
+import device from "@system.device"
 import router from "@system.router"
 
 export default {
+  private: {
+    screenProfile: "pill-standard"
+  },
+
+  onInit() {
+    const app = this.$app.$def
+    this.screenProfile = app.data.screenProfile || "pill-standard"
+    device.getInfo({
+      success: (data) => {
+        app.updateScreenInfo(data)
+        this.screenProfile = app.data.screenProfile
+      },
+      fail: (data, code) => {
+        console.log("index device.getInfo failed: " + code)
+      }
+    })
+  },
+
   goInflectSearch() {
     router.push({
       uri: "/pages/search",
@@ -1847,7 +1994,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 39px;
   background-color: #020813;
   flex-direction: column;
@@ -1864,21 +2011,16 @@ export default {
 }
 
 .icon-card {
-  width: 98px;
-  height: 88px;
-  margin-top: 12px;
-  margin-bottom: 19px;
-  border-radius: 25px;
-  border-width: 2px;
-  border-color: #1d74e8;
-  background-color: #07101d;
-  justify-content: center;
-  align-items: center;
+  display: none;
 }
 
 .deco-icon {
-  width: 84px;
-  height: 84px;
+  display: none;
+}
+
+.button-group {
+  flex-direction: column;
+  align-items: center;
 }
 
 .main-button {
@@ -1935,8 +2077,155 @@ export default {
 
 .btn-label-sm {
   color: #ffffff;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
+}
+
+/* 启动时由 device.getInfo 选择档案，避免已知不兼容的 shape 媒体查询。 */
+.icon-card-pill-standard {
+  display: flex;
+  width: 98px;
+  height: 88px;
+  margin-top: 12px;
+  margin-bottom: 19px;
+  border-radius: 25px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-pill-standard {
+  display: flex;
+  width: 84px;
+  height: 84px;
+}
+
+.page-pill-compact {
+  padding-top: 30px;
+}
+
+.title-pill-compact {
+  height: 38px;
+  font-size: 28px;
+}
+
+.icon-card-pill-compact {
+  display: flex;
+  width: 76px;
+  height: 68px;
+  margin-top: 6px;
+  margin-bottom: 12px;
+  border-radius: 22px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-pill-compact {
+  display: flex;
+  width: 64px;
+  height: 64px;
+}
+
+.main-button-pill-compact {
+  height: 46px;
+  margin-bottom: 9px;
+}
+
+.bottom-row-pill-compact {
+  height: 40px;
+  margin-top: -1px;
+}
+
+.small-button-pill-compact {
+  height: 40px;
+}
+
+.title-rect,
+.title-circle {
+  margin-bottom: 8px;
+}
+
+.page-circle {
+  padding-top: 32px;
+}
+
+.button-group-rect {
+  width: 84%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.button-group-circle {
+  width: 76%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.main-button-rect,
+.main-button-circle {
+  width: 47%;
+  height: 68px;
+  margin-bottom: 12px;
+}
+
+.btn-icon-rect,
+.btn-icon-circle {
+  width: 22px;
+  height: 22px;
+  margin-left: 8px;
+  margin-right: 4px;
+}
+
+.bottom-row-rect,
+.bottom-row-circle {
+  margin-top: 10px;
+}
+
+.icon-card-rect {
+  display: flex;
+  width: 92px;
+  height: 92px;
+  margin-bottom: 16px;
+  border-radius: 26px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-rect {
+  display: flex;
+  width: 86px;
+  height: 86px;
+}
+
+.icon-card-circle {
+  display: flex;
+  width: 84px;
+  height: 84px;
+  margin-bottom: 14px;
+  border-radius: 24px;
+  border-width: 2px;
+  border-color: #1d74e8;
+  background-color: #07101d;
+  justify-content: center;
+  align-items: center;
+}
+
+.deco-icon-circle {
+  display: flex;
+  width: 78px;
+  height: 78px;
 }
 
 .about-button {
@@ -1965,19 +2254,34 @@ export default {
       <text class="back-mark">返回</text>
     </div>
 
-    <list class="record-list" if="{{ records.length > 0 }}">
-      <list-item class="record-item" type="recordCard" for="{{ item in records }}" tid="id">
-        <div class="record-card" @click="openRecord(item)">
-          <text class="record-title">{{ item.title }}</text>
-          <div class="record-bottom">
-            <text class="record-desc">{{ item.shortTranslation }}</text>
-            <text class="record-meta">{{ item.metaText }}</text>
+    <list class="record-list" if="{{ recordItems.length > 0 }}" style="width: {{cardWidth}}px;">
+      <list-item
+        class="record-item"
+        type="recordCard"
+        for="{{ item in recordItems }}"
+        tid="id"
+        style="width: {{cardWidth}}px; height: {{ item.itemHeight }}px;"
+      >
+        <div class="record-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openRecord(item)">
+          <div class="record-head">
+            <text if="{{ !item.wordMarqueeOn }}" class="record-title">{{ item.title }}</text>
+            <text if="{{ item.wordMarqueeOn && !marqueeArmed }}" class="record-title">{{ item.title }}</text>
+            <marquee if="{{ item.wordMarqueeOn && marqueeArmed }}" class="record-title-marquee"
+              scrollamount="{{ item.wordMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+              {{ item.title }}   {{ item.title }}
+            </marquee>
+            <text class="record-tag">{{ item.tag }}</text>
+          </div>
+          <div class="record-translation-box">
+            <text class="record-translation-line" for="{{ line in item.translationLines }}">
+              {{ line }}
+            </text>
           </div>
         </div>
       </list-item>
     </list>
 
-    <text class="empty-text" if="{{ records.length == 0 }}">{{ emptyText }}</text>
+    <text class="empty-text" if="{{ recordItems.length == 0 }}">{{ emptyText }}</text>
   </div>
 </template>
 
@@ -1991,22 +2295,88 @@ export default {
   },
 
   private: {
-    records: [],
+    recordItems: [],
     emptyText: "",
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    destroyed: false,
+    cardWidth: 188,
+    contentWidth: 164,
+    screenWidth: 0,
+    wordMarqueeThreshold: 10,
+    marqueeArmed: false
   },
 
   onInit() {
+    const sw = this.$app.$def.data.screenWidth || 212
+    this.screenWidth = sw
+    this.cardWidth = sw - 20
+    this.contentWidth = this.cardWidth - 24
+    this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
     this.loadRecords()
+  },
+
+  onDestroy() {
+    this.destroyed = true
   },
 
   onShow() {
     this.loadRecords()
+    // 1.5s 让人先看清单词，再齐步启动所有跑马灯
+    setTimeout(() => {
+      this.marqueeArmed = true
+    }, 1500)
   },
 
   goBack() {
     router.back()
+  },
+
+  resolveWordMarqueeThreshold(sw) {
+    if (sw === 192) return 9
+    if (sw === 212) return 10
+    if (sw === 336) return 20
+    if (sw === 432) return 25
+    if (sw === 466) return 25
+    return 10
+  },
+
+  calcCardWordMarqueeSpeed(word) {
+    // 速度 ≈ 词长 × 4，让长词追上视觉上的同步循环。除非 word 太长会失控，用 60 封顶。
+    const len = (word || "").length
+    return Math.min(60, Math.max(40, len * 4))
+  },
+
+  canFitWithTag(word, tag) {
+    if (!tag) return true
+    const WORD_FONT = 28
+    const TAG_FONT = 18
+    const TAG_MARGIN = 8
+    const CARD_PADDING = 24
+    const WORD_GLYPH_RATIO = 0.72
+    const TAG_GLYPH_RATIO = 0.6
+    const SAFETY = 4
+    const safeLen = (word || "").length
+    if (safeLen === 0) return true
+    const wordW = safeLen * WORD_FONT * WORD_GLYPH_RATIO
+    const tagW = tag.length * TAG_FONT * TAG_GLYPH_RATIO + TAG_MARGIN + SAFETY
+    return wordW + tagW <= this.cardWidth - CARD_PADDING
+  },
+
+  highestTag(tag) {
+    if (!tag) return ""
+    const tags = tag.split(" ")
+    const priority = ["zk", "gk", "cet4", "cet6", "ky", "ielts", "toefl", "gre"]
+    let best = tags[0] || ""
+    let bestIdx = -1
+    for (let i = 0; i < tags.length; i++) {
+      const idx = priority.indexOf(tags[i])
+      if (idx > bestIdx) {
+        bestIdx = idx
+        best = tags[i]
+      }
+    }
+    return best
   },
 
   loadRecords() {
@@ -2015,10 +2385,12 @@ export default {
     storage.get({
       key: key,
       success: (data) => {
-        this.records = this.buildRecords(this.parseList(data))
+        if (this.destroyed) return
+        this.recordItems = this.buildRecords(this.parseList(data))
       },
       fail: () => {
-        this.records = []
+        if (this.destroyed) return
+        this.recordItems = []
       }
     })
   },
@@ -2028,11 +2400,12 @@ export default {
       return
     }
     if (this.type === "history") {
-      router.replace({
-        uri: "/pages/search",
+      router.push({
+        uri: "/pages/results",
         params: {
-          queryParam: item.query || "",
-          autoSearch: "1"
+          query: item.query || item.word || "",
+          searchMode: "",
+          inflectDepth: "0"
         }
       })
       return
@@ -2044,9 +2417,11 @@ export default {
       uri: "/pages/detail",
       params: {
         word: item.word,
-        phonetic: item.phonetic || "",
+        phonetic: item.rawPhonetic || "",
         translation: item.translation || "",
-        tag: item.tag || ""
+        tag: item.rawTag || "",
+        searchMode: "",
+        inflectDepth: "0"
       }
     })
   },
@@ -2066,48 +2441,153 @@ export default {
         continue
       }
       if (this.type === "history") {
-        if (!item.query) {
+        const query = (item.query || "").toString()
+        if (!query) {
           continue
         }
+        const displayTitle = query
+        const visibleTag = ""
+        const cardHeight = Math.max(80, 64)
+        const titleLen = displayTitle.length
+        const wordMarqueeOn = titleLen > this.wordMarqueeThreshold
+        const wordMarqueeSpeed = wordMarqueeOn ? this.calcCardWordMarqueeSpeed(displayTitle) : 40
         output.push({
-          id: this.normalizeWord(item.query) + "_" + i,
-          title: item.query,
-          query: item.query,
-          shortTranslation: "搜索词",
-          metaText: "" + (i + 1)
+          id: this.normalizeWord(query) + "_" + i,
+          title: displayTitle,
+          query: query,
+          recordKind: "history",
+          translationLines: [""],
+          rawTag: "",
+          tag: visibleTag,
+          cardHeight: cardHeight,
+          itemHeight: cardHeight + 10,
+          wordMarqueeOn: wordMarqueeOn,
+          wordMarqueeSpeed: wordMarqueeSpeed
         })
-      } else {
-        if (!item.word) {
-          continue
-        }
-        output.push({
-          id: this.normalizeWord(item.word) + "_" + i,
-          title: item.word,
-          word: item.word,
-          phonetic: item.phonetic || "",
-          translation: item.translation || "",
-          tag: item.tag || "",
-          shortTranslation: this.clipText(item.translation || "", 16),
-          metaText: this.buildMetaText(item.tag || "", i)
-        })
+        continue
       }
+      const word = (item.word || "").toString()
+      if (!word) {
+        continue
+      }
+      const phonetic = item.phonetic || ""
+      const translation = item.translation || ""
+      const bestTag = this.highestTag(item.tag || "")
+      const visibleTag = this.canFitWithTag(word, bestTag) ? bestTag : ""
+      const lines = this.wrapText(translation, this.contentWidth)
+      const safeLines = lines.length > 0 ? lines : [""]
+      const lineHeight = 22
+      const cardHeight = Math.max(100, 64 + safeLines.length * lineHeight)
+      const titleLen = word.length
+      const wordMarqueeOn = titleLen > this.wordMarqueeThreshold
+      const wordMarqueeSpeed = wordMarqueeOn ? this.calcCardWordMarqueeSpeed(word) : 40
+      output.push({
+        id: this.normalizeWord(word) + "_" + i,
+        title: word,
+        word: word,
+        phonetic: phonetic,
+        rawPhonetic: phonetic,
+        translation: translation,
+        translationLines: safeLines,
+        recordKind: "favorites",
+        tag: visibleTag,
+        rawTag: bestTag,
+        cardHeight: cardHeight,
+        itemHeight: cardHeight + 10,
+        wordMarqueeOn: wordMarqueeOn,
+        wordMarqueeSpeed: wordMarqueeSpeed
+      })
     }
     return output
   },
 
-  buildMetaText(tag, index) {
-    if (tag) {
-      return this.clipText(tag, 5)
+  wrapText(value, maxWidth) {
+    const text = (value || "").replace(/\s+/g, " ").trim()
+    if (!text || maxWidth <= 0) {
+      return []
     }
-    return "" + (index + 1)
+
+    const lines = []
+    let line = ""
+    let width = 0
+    let lastBreak = -1
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charAt(i)
+      const chWidth = this.getCharWidth(ch)
+
+      if (width + chWidth > maxWidth && line.length > 0) {
+        if (lastBreak > 0) {
+          lines.push(line.slice(0, lastBreak).trim())
+          line = line.slice(lastBreak).trim() + ch
+        } else {
+          lines.push(line.trim())
+          line = ch
+        }
+        width = this.measureTextWidth(line)
+        lastBreak = this.findLastBreak(line)
+      } else {
+        line += ch
+        width += chWidth
+      }
+
+      if (ch === " " || ch === ";" || ch === "," || ch === "，" || ch === "；") {
+        lastBreak = line.length
+      }
+    }
+
+    if (line.trim()) {
+      lines.push(line.trim())
+    }
+    return lines
   },
 
-  clipText(value, maxLen) {
-    const text = (value || "").replace(/\s+/g, " ").trim()
-    if (text.length <= maxLen) {
-      return text
+  measureTextWidth(value) {
+    let width = 0
+    for (let i = 0; i < value.length; i++) {
+      width += this.getCharWidth(value.charAt(i))
     }
-    return text.slice(0, maxLen) + "..."
+    return width
+  },
+
+  findLastBreak(value) {
+    for (let i = value.length - 1; i >= 0; i--) {
+      const ch = value.charAt(i)
+      if (ch === " " || ch === ";" || ch === "," || ch === "，" || ch === "；") {
+        return i + 1
+      }
+    }
+    return -1
+  },
+
+  getCharWidth(ch) {
+    if (!ch) {
+      return 0
+    }
+    if (ch >= "\u4e00" && ch <= "\u9fff") {
+      return 13
+    }
+    if (ch >= "A" && ch <= "Z") {
+      return 8
+    }
+    if (ch >= "a" && ch <= "z") {
+      return 7
+    }
+    if (ch >= "0" && ch <= "9") {
+      return 7
+    }
+    if (
+      ch === " " ||
+      ch === "." ||
+      ch === "," ||
+      ch === ";" ||
+      ch === ":" ||
+      ch === "/" ||
+      ch === "-"
+    ) {
+      return 4
+    }
+    return 8
   },
 
   parseList(data) {
@@ -2121,6 +2601,7 @@ export default {
         return list
       }
     } catch (err) {
+      console.log("[腕上词典] storage data parse failed:", err && err.message)
       return []
     }
     return []
@@ -2146,8 +2627,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -2173,7 +2655,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 8px;
   background-color: #020813;
   flex-direction: column;
@@ -2202,61 +2684,65 @@ export default {
 }
 
 .record-list {
-  width: 190px;
-  height: 426px;
+  height: 388px;
+  margin-bottom: 4px;
 }
 
 .record-item {
-  width: 190px;
-  height: 110px;
+  /* width bound inline */
 }
 
 .record-card {
-  width: 190px;
-  height: 100px;
-  margin-bottom: 10px;
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 12px;
+  margin-bottom: 10px;
   border-radius: 20px;
   background-color: #242424;
   flex-direction: column;
 }
 
-.record-title {
-  width: 166px;
-  height: 42px;
-  color: #ffffff;
-  font-size: 28px;
-  font-weight: 800;
-  text-align: left;
-}
-
-.record-bottom {
-  width: 166px;
-  height: 34px;
-  margin-top: 3px;
+.record-head {
+  width: 100%;
+  height: 38px;
   flex-direction: row;
-  justify-content: space-between;
   align-items: center;
 }
 
-.record-desc {
-  width: 112px;
-  height: 32px;
-  color: #aeb0b4;
-  font-size: 22px;
-  font-weight: 700;
-  text-align: left;
+.record-title,
+.record-title-marquee {
+  flex: 1;
+  height: 38px;
+  color: #ffffff;
+  font-size: 28px;
+  font-weight: 800;
 }
 
-.record-meta {
-  width: 48px;
-  height: 32px;
+.record-title-marquee {
+  lines: 1;
+  text-overflow: clip;
+}
+
+.record-tag {
+  flex-shrink: 0;
+  height: 28px;
   color: #aeb0b4;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
-  text-align: right;
+  margin-left: 8px;
+}
+
+.record-translation-box {
+  width: 100%;
+  flex-direction: column;
+}
+
+.record-translation-line {
+  width: 100%;
+  height: 22px;
+  color: #aeb0b4;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .empty-text {
@@ -2280,20 +2766,29 @@ export default {
       <text class="back-text">返回</text>
     </div>
 
-    <text class="query-text">{{ queryText }}</text>
+    <marquee if="{{ queryMarqueeOn }}" id="query-marquee" class="query-marquee"
+      scrollamount="{{ queryMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+      {{ queryText }}   {{ queryText }}
+    </marquee>
+    <text if="{{ !queryMarqueeOn }}" class="query-text">{{ queryText }}</text>
     <text class="status-text" if="{{ statusText }}">{{ statusText }}</text>
 
-    <list class="result-list" if="{{ resultCards.length > 0 }}">
+    <list class="result-list" if="{{ resultCards.length > 0 }}" style="width: {{cardWidth}}px;">
       <list-item
         class="result-item"
         type="resultCard"
         for="{{ item in resultCards }}"
         tid="id"
-        style="height: {{ item.itemHeight }}px;"
+        style="width: {{cardWidth}}px; height: {{ item.itemHeight }}px;"
       >
-        <div class="result-card" style="height: {{ item.cardHeight }}px;" @click="openDetail(item)">
+        <div class="result-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openDetail(item)">
           <div class="result-head">
-            <text class="result-word">{{ item.word }}</text>
+            <text if="{{ !item.wordMarqueeOn }}" class="result-word">{{ item.word }}</text>
+            <text if="{{ item.wordMarqueeOn && !marqueeArmed }}" class="result-word">{{ item.word }}</text>
+            <marquee if="{{ item.wordMarqueeOn && marqueeArmed }}" class="result-word-marquee"
+              scrollamount="{{ item.wordMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+              {{ item.word }}   {{ item.word }}
+            </marquee>
             <text class="result-tag">{{ item.tag }}</text>
           </div>
           <text class="result-phonetic">{{ item.phonetic }}</text>
@@ -2315,6 +2810,8 @@ import prompt from "@system.prompt"
 
 const FUZZY_SCAN_LIMIT = 4000
 const FUZZY_POOL_LIMIT = 80
+const MAX_SAFE_ENTRY_ID = 9007199254740991
+const WORD_INDEX_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 
 class LRUCache {
   constructor(max) {
@@ -2365,15 +2862,62 @@ export default {
     lastToastAt: 0,
     toastCooldown: 1500,
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    destroyed: false,
+    cardWidth: 0,
+    contentWidth: 0,
+    screenWidth: 0,
+    queryMarqueeOn: false,
+    queryMarqueeSpeed: 40,
+    wordMarqueeThreshold: 0,
+    marqueeArmed: false
   },
 
   onInit() {
     this.fileCache = new LRUCache(5)
     this.entryCache = new LRUCache(3)
     this.cnIndexCache = new LRUCache(10)
+    const sw = this.$app.$def.data.screenWidth || 212
+    this.screenWidth = sw
+    this.cardWidth = sw - 20
+    this.contentWidth = this.cardWidth - 24
+    this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
     this.queryText = this.normalizeWord(this.query)
+    this.applyQueryMarquee(this.queryText)
     this.performSearch()
+  },
+
+  onShow() {
+    // 1.5s 让人先看清单词，再齐步启动所有跑马灯
+    setTimeout(() => {
+      this.marqueeArmed = true
+    }, 1500)
+  },
+
+  resolveWordMarqueeThreshold(sw) {
+    if (sw === 192) return 9
+    if (sw === 212) return 10
+    if (sw === 336) return 20
+    if (sw === 432) return 25
+    if (sw === 466) return 25
+    return 10
+  },
+
+  applyQueryMarquee(text) {
+    if (text && text.length > 12) {
+      this.queryMarqueeOn = true
+      const extra = text.length - 12
+      this.queryMarqueeSpeed = Math.max(40, Math.min(60, Math.round(40 + extra * 1.5)))
+    } else {
+      this.queryMarqueeOn = false
+      this.queryMarqueeSpeed = 40
+    }
+  },
+
+  calcCardWordMarqueeSpeed(word) {
+    // 速度 ≈ 词长 × 4，让长词追上视觉上的同步循环。除非 word 太长会失控，用 60 封顶。
+    const len = (word || "").length
+    return Math.min(60, Math.max(40, len * 4))
   },
 
   goBack() {
@@ -2391,7 +2935,7 @@ export default {
         word: item.word,
         phonetic: item.rawPhonetic || "",
         translation: item.translation || "",
-        tag: item.tag || "",
+        tag: item.rawTag || item.tag || "",
         searchMode: this.searchMode || "",
         inflectDepth: this.inflectDepth || "0"
       }
@@ -2435,9 +2979,8 @@ export default {
 
       const results = []
       const seen = {}
-      const shards = this.getCandidateShards(normalized)
 
-      this.collectShardResults(shards, normalized, results, seen, 0, () => {
+      if (this.searchMode === "inflect") {
         this.collectInflectResult(normalized, results, seen, () => {
           if (token !== this.searchToken) {
             return
@@ -2445,7 +2988,19 @@ export default {
 
           this.finishEnglishSearch(normalized, token, results)
         })
-      })
+      } else {
+        const shards = this.getCandidateShards(normalized)
+
+        this.collectShardResults(shards, normalized, results, seen, 0, () => {
+          this.collectInflectResult(normalized, results, seen, () => {
+            if (token !== this.searchToken) {
+              return
+            }
+
+            this.finishEnglishSearch(normalized, token, results)
+          })
+        })
+      }
     })
   },
 
@@ -2524,7 +3079,7 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2 && parts[0] === firstChar) {
-          done(parts[1].split(","))
+          done(this.decodeDeltaIds(parts[1]))
           return
         }
       }
@@ -2583,7 +3138,7 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split("\t")
         if (parts.length >= 2) {
-          indexMap[parts[0]] = parts[1].split(",")
+          indexMap[parts[0]] = this.decodeDeltaIds(parts[1])
         }
       }
       this.cnIndexCache.set(bucket, indexMap)
@@ -2605,7 +3160,7 @@ export default {
       // Prefix match fallback: max 20 candidate keys, 10 IDs per key, 50 total
       if (!ids) {
         const candidates = Object.keys(indexMap)
-          .filter(key => key.indexOf(query) === 0)
+          .filter((key) => key.indexOf(query) === 0)
           .slice(0, 20)
 
         const allIds = []
@@ -2704,29 +3259,21 @@ export default {
       return
     }
 
-    this.readText("/common/dict/index_en.txt", (text) => {
-      const index = {}
-      const lines = text.split("\n")
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
-        if (!line) {
-          continue
-        }
-        const parts = line.split("\t")
-        if (parts.length >= 2) {
-          index[parts[0]] = parts[1].split(",")
-        }
-      }
-      this.shardIndex = index
-      done()
-    })
+    const index = {}
+    for (let i = 0; i < WORD_INDEX_LETTERS.length; i++) {
+      const letter = WORD_INDEX_LETTERS.charAt(i)
+      index[letter] = [letter]
+    }
+    this.shardIndex = index
+    done()
   },
 
   getCandidateShards(query) {
-    if (query.length === 1 && this.shardIndex && this.shardIndex[query]) {
-      return this.shardIndex[query]
+    const first = this.normalizeWord(query).charAt(0)
+    if (first >= "a" && first <= "z") {
+      return [first]
     }
-    return [this.keyFor(query)]
+    return []
   },
 
   collectShardResults(shards, query, results, seen, index, done) {
@@ -2736,9 +3283,12 @@ export default {
     }
 
     const shard = shards[index]
-    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
-      this.scanWordText(text, query, results, seen, "")
-      this.collectShardResults(shards, query, results, seen, index + 1, done)
+    this.readText("/common/dict/words/word_" + shard + ".txt", (text) => {
+      const candidates = []
+      this.collectCompactWordCandidates(text, query, candidates, seen, "", 20 - results.length)
+      this.hydrateCompactCandidates(candidates, results, 0, () => {
+        this.collectShardResults(shards, query, results, seen, index + 1, done)
+      })
     })
   },
 
@@ -2764,7 +3314,109 @@ export default {
           break
         }
       }
-      this.collectBaseResults(bases, results, seen, 0, done)
+      this.collectBaseResults(bases, results, seen, 0, () => {
+        this.collectReverseInflectResult(query, results, seen, done)
+      })
+    })
+  },
+
+  collectReverseInflectResult(query, results, seen, done) {
+    if (results.length >= 20) {
+      done()
+      return
+    }
+
+    const shard = this.keyFor(query)
+    this.readText("/common/dict/inflect_reverse/ireverse_" + shard + ".txt", (text) => {
+      const forms = []
+      const lines = text.split("\n")
+      for (let i = 0; i < lines.length; i++) {
+        const parts = lines[i].split("\t")
+        if (parts.length >= 2 && parts[0] === query) {
+          const words = parts[1].split(",")
+          for (let j = 0; j < words.length; j++) {
+            const w = words[j]
+            if (w && w !== query && !seen[w]) {
+              forms.push(w)
+            }
+          }
+          break
+        }
+      }
+      this.collectFormResults(query, forms, results, seen, 0, done)
+    })
+  },
+
+  collectFormResults(baseWord, forms, results, seen, index, done) {
+    if (index >= forms.length || results.length >= 20) {
+      done()
+      return
+    }
+
+    const form = forms[index]
+    const lower = this.normalizeWord(form)
+    if (!lower || seen[lower]) {
+      this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+      return
+    }
+    seen[lower] = true
+
+    // 先查词库，有则用词库释义；无则用词根释义
+    const first = lower.charAt(0)
+    if (first >= "a" && first <= "z") {
+      this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+        const candidates = []
+        this.collectCompactWordCandidates(text, form, candidates, seen, "变形", 1)
+        if (candidates.length > 0) {
+          this.hydrateCompactCandidates(candidates, results, 0, () => {
+            this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+          })
+        } else {
+          this.hydrateFromBaseWord(baseWord, form, results, () => {
+            this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+          })
+        }
+      })
+    } else {
+      this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
+    }
+  },
+
+  hydrateFromBaseWord(baseWord, displayWord, results, done) {
+    const first = this.normalizeWord(baseWord).charAt(0)
+    if (first < "a" || first > "z") {
+      done()
+      return
+    }
+    this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+      const lines = text.split("\n")
+      for (let i = 0; i < lines.length; i++) {
+        const parts = lines[i].split("\t")
+        if (parts.length >= 3 && parts[0].toLowerCase() === baseWord.toLowerCase()) {
+          const entryId = this.parseEntryId(parts[1])
+          if (entryId >= 0) {
+            const shard = this.entryShardFor(entryId)
+            this.loadEntryShard(shard, (entries) => {
+              const item = entries[entryId]
+              if (item) {
+                results.push(
+                  this.createResultCard(
+                    this.normalizeWord(displayWord),
+                    displayWord,
+                    item.phonetic,
+                    item.translation,
+                    "变形"
+                  )
+                )
+              }
+              done()
+            })
+            return
+          }
+          break
+        }
+      }
+      done()
     })
   },
 
@@ -2775,19 +3427,28 @@ export default {
     }
 
     const base = bases[index]
-    const shard = this.keyFor(base)
-    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
-      this.scanWordText(text, this.normalizeWord(base), results, seen, "变形")
+    const first = this.normalizeWord(base).charAt(0)
+    if (first < "a" || first > "z") {
       this.collectBaseResults(bases, results, seen, index + 1, done)
+      return
+    }
+
+    this.readText("/common/dict/words/word_" + first + ".txt", (text) => {
+      const candidates = []
+      this.collectCompactWordCandidates(text, base, candidates, seen, "变形", 1)
+      this.hydrateCompactCandidates(candidates, results, 0, () => {
+        this.collectBaseResults(bases, results, seen, index + 1, done)
+      })
     })
   },
 
-  scanWordText(text, query, results, seen, source) {
-    if (!text) {
+  collectCompactWordCandidates(text, query, candidates, seen, source, limit) {
+    if (!text || limit <= 0) {
       return
     }
+    const normalizedQuery = this.normalizeWord(query)
     const lines = text.split("\n")
-    for (let i = 0; i < lines.length && results.length < 20; i++) {
+    for (let i = 0; i < lines.length && candidates.length < limit; i++) {
       const parts = lines[i].split("\t")
       if (parts.length < 3) {
         continue
@@ -2799,16 +3460,59 @@ export default {
         continue
       }
       if (source) {
-        if (lower !== query) {
+        if (lower !== normalizedQuery) {
           continue
         }
-      } else if (lower.indexOf(query) !== 0) {
+      } else if (lower.indexOf(normalizedQuery) !== 0) {
         continue
       }
 
+      const entryId = this.parseEntryId(parts[1])
+      if (entryId < 0) {
+        continue
+      }
       seen[lower] = true
-      results.push(this.createResultCard(lower, word, parts[1], parts[2], source || parts[3] || ""))
+      candidates.push({
+        entryId: entryId,
+        lower: lower,
+        word: word,
+        tag: parts[2] || "",
+        source: source
+      })
     }
+  },
+
+  hydrateCompactCandidates(candidates, results, index, done) {
+    if (index >= candidates.length || results.length >= 20) {
+      done()
+      return
+    }
+
+    const candidate = candidates[index]
+    const shard = this.entryShardFor(candidate.entryId)
+    this.loadEntryShard(shard, (entries) => {
+      let nextIndex = index
+      while (nextIndex < candidates.length && results.length < 20) {
+        const next = candidates[nextIndex]
+        if (this.entryShardFor(next.entryId) !== shard) {
+          break
+        }
+        const item = entries[next.entryId]
+        if (item) {
+          results.push(
+            this.createResultCard(
+              next.lower,
+              item.word || next.word,
+              item.phonetic,
+              item.translation,
+              next.source || item.tag || next.tag
+            )
+          )
+        }
+        nextIndex++
+      }
+      this.hydrateCompactCandidates(candidates, results, nextIndex, done)
+    })
   },
 
   collectFuzzyResults(query, done) {
@@ -2827,28 +3531,30 @@ export default {
         return left.word.length - right.word.length
       })
 
-      const cards = []
-      for (let i = 0; i < items.length && cards.length < 20; i++) {
-        const item = items[i]
-        cards.push(
-          this.createResultCard(item.lower, item.word, item.phonetic, item.translation, "相近")
-        )
+      const candidates = []
+      for (let i = 0; i < items.length; i++) {
+        candidates.push({
+          entryId: items[i].entryId,
+          lower: items[i].lower,
+          word: items[i].word,
+          tag: items[i].tag,
+          source: "相近"
+        })
       }
-      done(cards)
+      const cards = []
+      this.hydrateCompactCandidates(candidates, cards, 0, () => done(cards))
     })
   },
 
   getFuzzyShards(query) {
     const ordered = []
     const seen = {}
-    const first = query.charAt(0)
-    if (this.shardIndex && this.shardIndex[first]) {
-      this.pushUniqueShards(ordered, seen, this.shardIndex[first])
+    const first = this.normalizeWord(query).charAt(0)
+    if (first >= "a" && first <= "z") {
+      this.pushUniqueShards(ordered, seen, [first])
     }
-    if (this.shardIndex) {
-      for (const key in this.shardIndex) {
-        this.pushUniqueShards(ordered, seen, this.shardIndex[key])
-      }
+    for (let i = 0; i < WORD_INDEX_LETTERS.length; i++) {
+      this.pushUniqueShards(ordered, seen, [WORD_INDEX_LETTERS.charAt(i)])
     }
     return ordered
   },
@@ -2874,7 +3580,7 @@ export default {
     }
 
     const shard = shards[index]
-    this.readText("/common/dict/words/dict_" + shard + ".txt", (text) => {
+    this.readText("/common/dict/words/word_" + shard + ".txt", (text) => {
       this.scanFuzzyWordText(text, query, items, seen)
       this.collectFuzzyShardResults(shards, query, items, seen, index + 1, done)
     })
@@ -2894,7 +3600,7 @@ export default {
     ) {
       this.fuzzyWordsChecked++
       const parts = lines[i].split("\t")
-      if (parts.length < 4) {
+      if (parts.length < 3) {
         continue
       }
       const lower = this.normalizeWord(parts[0])
@@ -2905,14 +3611,18 @@ export default {
       if (distance < 0 || distance > 2) {
         continue
       }
+      const entryId = this.parseEntryId(parts[1])
+      if (entryId < 0) {
+        continue
+      }
       seen[lower] = true
       items.push({
+        entryId: entryId,
         lower: lower,
         word: parts[0],
-        phonetic: parts[1],
-        translation: parts[2],
+        tag: parts[2] || "",
         distance: distance,
-        score: this.scoreFuzzyCandidate(query, lower, parts[3] || "")
+        score: this.scoreFuzzyCandidate(query, lower, parts[2] || "")
       })
     }
   },
@@ -2990,11 +3700,33 @@ export default {
     return score
   },
 
+  highestTag(tag) {
+    if (!tag) return ""
+    const tags = tag.split(" ")
+    const priority = ["zk", "gk", "cet4", "cet6", "ky", "ielts", "toefl", "gre"]
+    let best = tags[0] || ""
+    let bestIdx = -1
+    for (let i = 0; i < tags.length; i++) {
+      const idx = priority.indexOf(tags[i])
+      if (idx > bestIdx) {
+        bestIdx = idx
+        best = tags[i]
+      }
+    }
+    return best
+  },
+
   createResultCard(id, word, phonetic, translation, tag) {
-    const lines = this.wrapText(translation || "", 168)
+    const maxW = this.contentWidth
+    const lines = this.wrapText(translation || "", maxW)
     const safeLines = lines.length > 0 ? lines : [""]
     const lineHeight = 22
     const cardHeight = Math.max(100, 64 + safeLines.length * lineHeight)
+    const bestTag = this.highestTag(tag)
+    const showTag = this.canFitWithTag(word || "", bestTag)
+    const wordLen = (word || "").length
+    const wordMarqueeOn = wordLen > this.wordMarqueeThreshold
+    const wordMarqueeSpeed = wordMarqueeOn ? this.calcCardWordMarqueeSpeed(word) : 40
 
     return {
       id: id,
@@ -3003,10 +3735,30 @@ export default {
       rawPhonetic: phonetic || "",
       translation: translation || "",
       translationLines: safeLines,
-      tag: tag,
+      tag: showTag ? bestTag : "",
+      rawTag: bestTag,
       cardHeight: cardHeight,
-      itemHeight: cardHeight + 10
+      itemHeight: cardHeight + 10,
+      wordMarqueeOn: wordMarqueeOn,
+      wordMarqueeSpeed: wordMarqueeSpeed
     }
+  },
+
+  canFitWithTag(word, tag) {
+    if (!tag) return true
+    const WORD_FONT = 28
+    const TAG_FONT = 18
+    const TAG_MARGIN = 8
+    const CARD_PADDING = 24
+    const WORD_GLYPH_RATIO = 0.72
+    const TAG_GLYPH_RATIO = 0.6
+    const SAFETY = 4
+
+    const safeLen = (word || "").length
+    if (safeLen === 0) return true
+    const wordW = safeLen * WORD_FONT * WORD_GLYPH_RATIO
+    const tagW = tag.length * TAG_FONT * TAG_GLYPH_RATIO + TAG_MARGIN + SAFETY
+    return wordW + tagW <= this.cardWidth - CARD_PADDING
   },
 
   wrapText(value, maxWidth) {
@@ -3109,11 +3861,13 @@ export default {
       uri: uri,
       encoding: "utf-8",
       success: (data) => {
+        if (this.destroyed) return
         const text = data && data.text ? data.text : ""
         this.fileCache.set(uri, text)
         done(text)
       },
       fail: () => {
+        if (this.destroyed) return
         this.fileCache.set(uri, "")
         done("")
       }
@@ -3125,7 +3879,7 @@ export default {
   },
 
   isEnglishWord(value) {
-    return /^[a-z][a-z'-]*$/.test(value || "")
+    return /^[a-z][a-z'-]{0,20}$/.test(value || "")
   },
 
   showToast(message) {
@@ -3138,6 +3892,13 @@ export default {
       message: message,
       duration: 1500
     })
+  },
+
+  onDestroy() {
+    this.destroyed = true
+    this.fileCache = null
+    this.entryCache = null
+    this.cnIndexCache = null
   },
 
   hasChinese(value) {
@@ -3189,9 +3950,59 @@ export default {
     return hex
   },
 
+  decodeDeltaIds(value) {
+    if (typeof value !== "string") {
+      return []
+    }
+
+    const normalized = value.trim()
+    if (!normalized) {
+      return []
+    }
+    const tokens = normalized.split(",")
+    const ids = []
+    let currentId = 0
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]
+      if (!token || !/^[0-9a-z]+$/.test(token)) {
+        return []
+      }
+
+      let delta = 0
+      for (let j = 0; j < token.length; j++) {
+        const ch = token.charAt(j)
+        const code = ch.charCodeAt(0)
+        const digit = code >= 48 && code <= 57 ? code - 48 : code - 87
+        if (digit < 0 || digit >= 36 || delta > Math.floor((MAX_SAFE_ENTRY_ID - digit) / 36)) {
+          return []
+        }
+        delta = delta * 36 + digit
+      }
+
+      if (i > 0 && delta === 0) {
+        return []
+      }
+      if (currentId > MAX_SAFE_ENTRY_ID - delta) {
+        return []
+      }
+      currentId += delta
+      ids.push(currentId)
+    }
+    return ids
+  },
+
   parseEntryId(value) {
-    const id = parseInt(value)
-    if (isNaN(id)) {
+    if (typeof value === "number") {
+      if (value < 0 || value > MAX_SAFE_ENTRY_ID || Math.floor(value) !== value) {
+        return -1
+      }
+      return value
+    }
+    if (typeof value !== "string" || !/^[0-9]+$/.test(value)) {
+      return -1
+    }
+    const id = parseInt(value, 10)
+    if (id < 0 || id > MAX_SAFE_ENTRY_ID || Math.floor(id) !== id) {
       return -1
     }
     return id
@@ -3238,8 +4049,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -3265,7 +4077,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
@@ -3290,7 +4102,8 @@ export default {
   text-align: center;
 }
 
-.query-text {
+.query-text,
+.query-marquee {
   width: 168px;
   height: 36px;
   margin-top: 12px;
@@ -3299,6 +4112,11 @@ export default {
   font-size: 24px;
   font-weight: 800;
   text-align: center;
+}
+
+.query-marquee {
+  lines: 1;
+  text-overflow: clip;
 }
 
 .status-text {
@@ -3311,17 +4129,15 @@ export default {
 }
 
 .result-list {
-  width: 190px;
   height: 388px;
   margin-bottom: 4px;
 }
 
 .result-item {
-  width: 190px;
+  /* width bound inline */
 }
 
 .result-card {
-  width: 190px;
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 12px;
@@ -3332,44 +4148,49 @@ export default {
 }
 
 .result-head {
-  width: 166px;
+  width: 100%;
   height: 38px;
   flex-direction: row;
-  justify-content: space-between;
   align-items: center;
 }
 
-.result-word {
-  width: 112px;
+.result-word,
+.result-word-marquee {
+  flex: 1;
   height: 38px;
   color: #ffffff;
   font-size: 28px;
   font-weight: 800;
 }
 
+.result-word-marquee {
+  lines: 1;
+  text-overflow: clip;
+}
+
 .result-tag {
-  width: 50px;
+  flex-shrink: 0;
   height: 28px;
   color: #aeb0b4;
   font-size: 18px;
   font-weight: 700;
-  text-align: right;
+  margin-left: 8px;
 }
 
 .result-phonetic {
-  width: 166px;
+  width: 100%;
   height: 22px;
   color: #aeb0b4;
   font-size: 16px;
 }
 
 .translation-box {
-  width: 166px;
+  width: 100%;
   flex-direction: column;
 }
 
 .result-translation-line {
-  width: 166px;
+  width: 100%;
   height: 22px;
   color: #aeb0b4;
   font-size: 18px;
@@ -3385,16 +4206,21 @@ export default {
 <import name="input-method" src="../../components/InputMethod/InputMethod.ux"></import>
 
 <template>
-  <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="search-button" @click="performSearch">
-      <img class="search-icon" src="/common/search-icon.png" />
+  <div class="page page-{{screenProfile}}" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="search-button" @click="onSearchButtonClick">
+      <img class="search-icon" if="{{ query }}" src="/common/search-icon.png" />
+      <text class="back-text" if="{{ !query }}">返回</text>
     </div>
 
-    <div class="input-box" @click="toggleKeyboard">
-      <text class="input-text">{{ displayText }}</text>
+    <div class="input-box input-box-{{screenProfile}}" @click="toggleKeyboard">
+      <!-- 常驻 marquee，短时静态、超长时从右向左平滑滚动 -->
+      <marquee id="marquee-text" class="input-text input-text-{{screenProfile}}"
+        scrollamount="{{marqueeSpeed}}" direction="left" loop="-1" text-offset="40">
+        {{ displayText }}
+      </marquee>
     </div>
 
-    <div class="edit-row">
+    <div class="edit-row edit-row-{{screenProfile}}">
       <input class="edit-button side-button" type="button" value="左" @click="moveLeft" />
       <input class="edit-button clear-button" type="button" value="清空" @click="clearText" />
       <input class="edit-button side-button" type="button" value="右" @click="moveRight" />
@@ -3403,54 +4229,25 @@ export default {
     <input-method
       hide="{{ keyboardHidden }}"
       keyboardtype="{{ keyboardType }}"
-      maxlength="5"
-      englishseed="{{ englishSeed }}"
-      englishsuggestions="{{ englishSuggestionsText }}"
+      maxlength="{{ maxLength }}"
       vibratemode="{{ vibrateMode }}"
       screentype="{{ screenType }}"
       @visibility-change="onVisibilityChange"
       @key-down="onKeyDown"
       @delete="onDelete"
       @complete="onComplete"
+      @ready="onReady"
     ></input-method>
   </div>
 </template>
 
 <script>
+import device from "@system.device"
 import router from "@system.router"
 import storage from "@system.storage"
 import prompt from "@system.prompt"
 import file from "@system.file"
-
-// ENGLISH_SUGGESTION_BUCKETS (327KB) is loaded as a JSON resource via file.readText()
-// to avoid bloating the search.js bundle
-let _suggestionBuckets = null
-
-function readResourceJSON(uri) {
-  return new Promise((resolve, reject) => {
-    file.readText({
-      uri: uri,
-      encoding: "utf-8",
-      success: (data) => {
-        try {
-          resolve(JSON.parse(data.text))
-        } catch (e) {
-          reject(e)
-        }
-      },
-      fail: (data, code) => {
-        reject(new Error("file.readText failed: " + code))
-      }
-    })
-  })
-}
-
-async function ensureSuggestionBuckets() {
-  if (!_suggestionBuckets) {
-    _suggestionBuckets = await readResourceJSON("/Common/english_suggestions.json")
-  }
-  return _suggestionBuckets
-}
+import {setSuggestionSeed, setSuggestions} from "../../common/suggestionState"
 
 const ENGLISH_SUFFIXES = [
   "s",
@@ -3476,7 +4273,8 @@ export default {
     queryParam: "",
     autoSearch: "",
     searchMode: "",
-    inflectDepth: ""
+    inflectDepth: "",
+    screenProfile: "pill-standard"
   },
 
   private: {
@@ -3487,15 +4285,41 @@ export default {
     englishSuggestionsText: "",
     keyboardHidden: false,
     keyboardType: "QWERTY",
-    vibrateMode: "short",
     screenType: "pill-shaped",
+    maxLength: 5,
+    vibrateMode: "short",
     lastToastAt: 0,
     toastCooldown: 1500,
     touchStartX: -1,
-    touchStartY: -1
+    touchStartY: -1,
+    destroyed: false,
+    autoSearchPending: false,
+    englishSuggestionCache: null,
+    englishSuggestionPending: null,
+    englishSuggestionToken: 0,
+    marqueeActive: false,
+    marqueeSpeed: 40
   },
 
   onInit() {
+    this.englishSuggestionCache = {}
+    this.englishSuggestionPending = {}
+    const app = this.$app.$def
+    this.applyScreenInfo(app.data)
+    device.getInfo({
+      success: (data) => {
+        app.updateScreenInfo(data)
+        this.applyScreenInfo(app.data)
+        this.maxLength = this.getMaxLength(
+          data.screenShape || app.data.screenShape,
+          Number(data.screenWidth || app.data.screenWidth || 212)
+        )
+        this.refreshDisplay()
+      },
+      fail: (data, code) => {
+        console.log("search device.getInfo failed: " + code)
+      }
+    })
     if (this.queryParam) {
       this.query = this.queryParam
       this.cursorIndex = this.query.length
@@ -3503,6 +4327,44 @@ export default {
     this.keyboardHidden = this.autoSearch === "1" ? true : false
     this.refreshDisplay()
     if (this.autoSearch === "1" && this.query) {
+      this.autoSearchPending = true
+      // 等待 InputMethod 异步初始化完成（ready 事件）后再跳转
+      // timeout 兜底，防止 ready 事件过早/过晚触发
+      setTimeout(() => {
+        if (this.autoSearchPending) {
+          this.autoSearchPending = false
+          this.performSearch()
+        }
+      }, 500)
+    }
+  },
+
+  applyScreenInfo(data) {
+    const screenShape = data.screenShape || "pill-shaped"
+    const screenWidth = Number(data.screenWidth || 212)
+    this.screenType = screenShape
+    this.screenProfile = data.screenProfile || "pill-standard"
+    this.maxLength = this.getMaxLength(screenShape, screenWidth)
+  },
+
+  getMaxLength(screenShape, screenWidth) {
+    if (screenShape === "circle") {
+      return 12
+    }
+    if (screenShape === "rect") {
+      return screenWidth >= 400 ? 15 : 11
+    }
+    return 5
+  },
+
+  onDestroy() {
+    this.destroyed = true
+    this.stopMarquee()
+  },
+
+  onReady() {
+    if (this.autoSearchPending) {
+      this.autoSearchPending = false
       this.performSearch()
     }
   },
@@ -3559,6 +4421,14 @@ export default {
       this.cursorIndex++
     }
     this.refreshDisplay()
+  },
+
+  onSearchButtonClick() {
+    if (!this.query) {
+      router.back()
+      return
+    }
+    this.performSearch()
   },
 
   performSearch() {
@@ -3667,6 +4537,7 @@ export default {
         return list
       }
     } catch (err) {
+      console.log("[腕上词典] storage data parse failed:", err && err.message)
       return []
     }
     return []
@@ -3688,8 +4559,10 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const appData = (this.$app && this.$app.$def && this.$app.$def.data) || {}
+    const sw = appData.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -3712,10 +4585,14 @@ export default {
 
   refreshDisplay() {
     if (!this.query) {
+      this.stopMarquee()
       this.cursorIndex = 0
       this.displayText = ""
       this.englishSeed = ""
       this.englishSuggestionsText = ""
+      this.englishSuggestionToken++
+      setSuggestionSeed("")
+      setSuggestions("")
       return
     }
 
@@ -3726,11 +4603,40 @@ export default {
       this.cursorIndex = this.query.length
     }
 
-    this.displayText =
-      this.query.slice(0, this.cursorIndex) +
-      (this.keyboardHidden ? "" : "_") +
-      this.query.slice(this.cursorIndex)
+    if (this.query.length > this.maxLength && this.keyboardHidden) {
+      this.startMarquee()
+    } else {
+      this.stopMarquee()
+      this.displayText =
+        this.query.slice(0, this.cursorIndex) +
+        (this.keyboardHidden ? "" : "_") +
+        this.query.slice(this.cursorIndex)
+    }
     this.updateEnglishSeed()
+  },
+
+  startMarquee() {
+    this.marqueeSpeed = this.calcMarqueeSpeed(this.query.length)
+    this.displayText = this.query + "   " + this.query
+    setTimeout(() => {
+      const el = this.$element("marquee-text")
+      if (el && el.start) {
+        el.start()
+      }
+    }, 50)
+  },
+
+  stopMarquee() {
+    const el = this.$element("marquee-text")
+    if (el && el.stop) {
+      el.stop()
+    }
+  },
+
+  calcMarqueeSpeed(textLength) {
+    const extra = Math.max(0, textLength - this.maxLength)
+    // 字符越长滚动越快，范围 40~60 px/tick
+    return Math.max(40, Math.min(60, Math.round(40 + extra * 1.5)))
   },
 
   updateEnglishSeed() {
@@ -3744,25 +4650,78 @@ export default {
     this.refreshEnglishSuggestions(nextSeed)
   },
 
-  async refreshEnglishSuggestions(seed) {
-    const buckets = await ensureSuggestionBuckets()
+  refreshEnglishSuggestions(seed) {
     const normalized = this.normalizeEnglishSeed(seed)
+    const suggestionToken = ++this.englishSuggestionToken
     if (!normalized) {
       this.englishSuggestionsText = ""
+      setSuggestionSeed("")
+      setSuggestions("")
       return
     }
 
-    const source = buckets[normalized.charAt(0)] || ""
+    this.loadEnglishSuggestionSource(normalized.charAt(0), (source) => {
+      if (suggestionToken !== this.englishSuggestionToken) {
+        return
+      }
+      this.applyEnglishSuggestions(normalized, source)
+    })
+  },
+
+  loadEnglishSuggestionSource(letter, done) {
+    if (Object.prototype.hasOwnProperty.call(this.englishSuggestionCache, letter)) {
+      done(this.englishSuggestionCache[letter])
+      return
+    }
+    if (this.englishSuggestionPending[letter]) {
+      this.englishSuggestionPending[letter] = done
+      return
+    }
+
+    this.englishSuggestionPending[letter] = done
+
+    file.readText({
+      uri: "/common/dict/words/word_" + letter + ".txt",
+      encoding: "utf-8",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const text = data && data.text ? data.text : ""
+        this.englishSuggestionCache[letter] = text
+        const pending = this.englishSuggestionPending[letter]
+        delete this.englishSuggestionPending[letter]
+        pending(text)
+      },
+      fail: () => {
+        if (this.destroyed) {
+          return
+        }
+        this.englishSuggestionCache[letter] = ""
+        const pending = this.englishSuggestionPending[letter]
+        delete this.englishSuggestionPending[letter]
+        pending("")
+      }
+    })
+  },
+
+  applyEnglishSuggestions(normalized, source) {
     const rows = source ? source.split("\n") : []
     const items = []
     const seen = {}
     this.scanEnglishSuggestionRows(rows, normalized, items, seen)
-    this.englishSuggestionsText = this.buildEnglishSuggestions(normalized, items, seen).join("|")
+    const suggestions = this.buildEnglishSuggestions(normalized, items, seen).join("|")
+    this.englishSuggestionsText = suggestions
+    setSuggestionSeed(normalized)
+    setSuggestions(suggestions)
   },
 
   scanEnglishSuggestionRows(rows, seed, items, seen) {
     for (let i = 0; i < rows.length; i++) {
       const parts = rows[i].split("\t")
+      if (parts.length < 3 || !/^(0|[1-9]\d*)$/.test(parts[1])) {
+        continue
+      }
       const word = this.normalizeEnglishSeed(parts[0])
       if (!word || word === seed || seen[word] || word.indexOf(seed) !== 0) {
         continue
@@ -3770,7 +4729,7 @@ export default {
       seen[word] = true
       items.push({
         word: word,
-        score: this.scoreEnglishCandidate(seed, word, parts[1] || "")
+        score: this.scoreEnglishCandidate(seed, word, parts[2] || "")
       })
     }
   },
@@ -3833,7 +4792,7 @@ export default {
   },
 
   isEnglishWord(value) {
-    return /^[a-z][a-z'-]*$/.test(value || "")
+    return /^[a-z][a-z'-]{0,20}$/.test(value || "")
   },
 
   hasEnglish(value) {
@@ -3867,7 +4826,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
@@ -3888,6 +4847,15 @@ export default {
   height: 40px;
 }
 
+.back-text {
+  width: 70px;
+  height: 30px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .input-box {
   width: 168px;
   height: 52px;
@@ -3899,16 +4867,18 @@ export default {
   border-color: #2f8cff;
   border-radius: 18px;
   background-color: #08172b;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 4px;
 }
 
 .input-text {
-  width: 140px;
+  width: 100%;
   height: 36px;
   color: #ffffff;
   font-size: 26px;
   font-weight: 700;
-  text-align: center;
+  text-align: left;
 }
 
 .edit-row {
@@ -3937,6 +4907,30 @@ export default {
   width: 62px;
   background-color: #d82626;
 }
+
+.input-box-rect {
+  width: 72%;
+}
+
+.input-text-rect {
+  font-size: 22px;
+}
+
+.input-box-circle {
+  width: 62%;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.input-text-circle {
+  font-size: 22px;
+}
+
+.page-circle {
+  padding-top: 16px;
+}
+
+
 </style>
 
 
@@ -3983,8 +4977,9 @@ export default {
 
     const endX = point.clientX
     const endY = point.clientY
-    const startsInLeftQuarter = this.touchStartX <= 53
-    const endsAtRightQuarter = endX >= 159
+    const sw = this.$app.$def.data.screenWidth || 212
+    const startsInLeftQuarter = this.touchStartX <= sw * 0.25
+    const endsAtRightQuarter = endX >= sw * 0.75
     const mostlyHorizontal = Math.abs(endY - this.touchStartY) <= 120
 
     if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal) {
@@ -4010,7 +5005,7 @@ export default {
 <style>
 .page {
   width: 100%;
-  height: 520px;
+  height: 100%;
   padding-top: 24px;
   background-color: #020813;
   flex-direction: column;
@@ -4040,5 +5035,6 @@ export default {
   height: 188px;
   margin-top: 68px;
 }
+
 </style>
 

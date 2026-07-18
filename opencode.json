@@ -1,8 +1,164 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": [
-    "AGENTS.md",
-    ".opencode/instructions/vela.md",
-    ".opencode/instructions/poster-qc.md"
-  ]
+  "plugin": [
+    "oh-my-openagent"
+  ],
+  "model": "opencode/deepseek-v4-flash-free",
+  "permission": {
+    "read": "allow",
+    "write": "allow",
+    "edit": "allow",
+    "bash": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "task": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "skill": "allow",
+    "todowrite": "allow",
+    "session_info": "allow",
+    "session_list": "allow",
+    "session_read": "allow",
+    "session_search": "allow",
+    "codegraph_codegraph_explore": "allow",
+    "codegraph_codegraph_search": "allow",
+    "codegraph_codegraph_node": "allow",
+    "codegraph_codegraph_callers": "allow",
+    "context7_resolve-library-id": "allow",
+    "context7_query-docs": "allow",
+    "look_at": "allow",
+    "playwright_browser_navigate": "allow",
+    "playwright_browser_snapshot": "allow",
+    "playwright_browser_click": "allow",
+    "playwright_browser_type": "allow",
+    "playwright_browser_take_screenshot": "allow",
+    "playwright_browser_evaluate": "allow",
+    "playwright_browser_press_key": "allow",
+    "playwright_browser_wait_for": "allow",
+    "playwright_browser_fill_form": "allow",
+    "playwright_browser_file_upload": "allow",
+    "playwright_browser_select_option": "allow",
+    "playwright_browser_hover": "allow",
+    "playwright_browser_resize": "allow",
+    "playwright_browser_tabs": "allow",
+    "playwright_browser_console_messages": "allow",
+    "playwright_browser_network_requests": "allow",
+    "playwright_browser_network_request": "allow",
+    "playwright_browser_find": "allow",
+    "playwright_browser_handle_dialog": "allow",
+    "playwright_browser_drag": "allow",
+    "playwright_browser_drop": "allow",
+    "playwright_browser_close": "allow",
+    "playwright_browser_navigate_back": "allow",
+    "playwright_browser_run_code_unsafe": "allow",
+    "skill_mcp": "allow"
+  },
+  "agent": {
+    "mini-vision": {
+      "model": "nvidia/minimaxai/minimax-m3",
+      "description": "子代理: MiniMax M3 via NVIDIA 图片识别",
+      "mode": "subagent",
+      "hidden": false
+    }
+  },
+  "provider": {
+    "opencode": {
+      "models": {
+        "deepseek-v4-flash-free": {
+          "options": {
+            "reasoningEffort": "max"
+          }
+        },
+        "big-pickle": {
+          "options": {
+            "reasoningEffort": "max"
+          }
+        }
+      }
+    },
+    "deepseek": {
+      "name": "DeepSeek",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": ""
+      },
+      "models": {
+        "deepseek-v4-flash": {
+          "id": "deepseek-v4-flash",
+          "name": "DeepSeek V4 Flash",
+          "limit": {
+            "context": 65536,
+            "output": 8192
+          },
+          "cost": {
+            "input": 0,
+            "output": 0
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "status": "active"
+        },
+        "deepseek-v4-pro": {
+          "id": "deepseek-v4-pro",
+          "name": "DeepSeek V4 Pro",
+          "limit": {
+            "context": 65536,
+            "output": 16384
+          },
+          "cost": {
+            "input": 0,
+            "output": 0
+          },
+          "modalities": {
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "status": "active"
+        }
+      }
+    },
+    "nvidia": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NVIDIA NIM",
+      "options": {
+        "baseURL": "https://integrate.api.nvidia.com/v1",
+        "apiKey": "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"
+      },
+      "models": {
+        "minimaxai/minimax-m3": {
+          "id": "minimaxai/minimax-m3",
+          "name": "MiniMax M3",
+          "limit": {
+            "context": 1000000,
+            "output": 131072
+          },
+          "cost": {
+            "input": 0,
+            "output": 0
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "status": "active"
+        }
+      }
+    }
+  },
+  "mcp": {}
 }

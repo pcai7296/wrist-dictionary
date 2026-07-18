@@ -273,6 +273,11 @@ export default {
     this.statusText = "搜索中"
 
     if (this.hasChinese(normalized)) {
+      if (normalized.length === 1) {
+        // Single character — skip cn_index (multi-character phrases only)
+        this.performChineseSearch(normalized, token)
+        return
+      }
       this.collectCn2EnResults(normalized, [], {}, (cnResults) => {
         if (token !== this.searchToken) {
           return

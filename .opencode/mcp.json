@@ -17,6 +17,39 @@
         "-y",
         "@pinkpixel/mcpollinations"
       ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    },
+    "sqlite": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "--db-path",
+        "J:/code/MI band/腕上词典/data/local.db"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+      }
     }
   }
 }

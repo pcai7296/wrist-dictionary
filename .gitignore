@@ -10,3 +10,4 @@
 /.omo/
 /.tmp/
 /opencode.json.bak*
+.opencode/mcp.json
