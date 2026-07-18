@@ -128,7 +128,9 @@ export default {
     queryMarqueeOn: false,
     queryMarqueeSpeed: 40,
     wordMarqueeThreshold: 0,
-    marqueeArmed: false
+    marqueeArmed: false,
+    _pendingCards: [],
+    _flushTimer: null
   },
 
   _expandTag(s) {
@@ -262,6 +264,7 @@ export default {
     this.queryText = normalized
 
     if (!normalized) {
+      this._stopFlushTimer()
       this.resultCards = []
       this.statusText = ""
       return
@@ -270,7 +273,9 @@ export default {
     const token = this.searchToken + 1
     this.searchToken = token
     this.resultCards = []
+    this._pendingCards = []
     this.statusText = "搜索中"
+    this._startFlushTimer()
 
     if (this.hasChinese(normalized)) {
       if (normalized.length === 1) {
@@ -282,6 +287,8 @@ export default {
         if (token !== this.searchToken) {
           return
         }
+        this._flushResults()
+        this._stopFlushTimer()
         if (this.resultCards.length > 0) {
           this.statusText = this.resultCards.length >= 20 ? "最多显示20条" : ""
         } else {
@@ -331,6 +338,8 @@ export default {
         if (token !== this.searchToken) {
           return
         }
+        this._flushResults()
+        this._stopFlushTimer()
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
         } else if (this.resultCards.length >= 20) {
@@ -342,6 +351,8 @@ export default {
       return
     }
 
+    this._flushResults()
+    this._stopFlushTimer()
     if (this.resultCards.length === 0) {
       this.statusText = "未找到"
     } else if (this.resultCards.length >= 20) {
@@ -371,6 +382,8 @@ export default {
           return
         }
 
+        this._flushResults()
+        this._stopFlushTimer()
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
         } else if (this.resultCards.length >= 20) {
@@ -431,7 +444,7 @@ export default {
             seen[lower] = true
             const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
             results.push(card)
-            this._emitResult(card)
+            this._enqueueCard(card)
           }
         }
         nextIndex++
@@ -539,7 +552,7 @@ export default {
             seen[lower] = true
             const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
             results.push(card)
-            this._emitResult(card)
+            this._enqueueCard(card)
           }
         }
         nextIndex++
@@ -722,7 +735,7 @@ export default {
             seen[lower] = true
             const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
             results.push(card)
-            this._emitResult(card)
+            this._enqueueCard(card)
           }
         }
         this.collectFormResults(baseWord, forms, results, seen, index + 1, done)
@@ -789,7 +802,7 @@ export default {
                   "变形"
                 )
                 results.push(card)
-                this._emitResult(card)
+                this._enqueueCard(card)
               }
               done()
             })
@@ -819,7 +832,7 @@ export default {
             seen[lower] = true
             const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
             results.push(card)
-            this._emitResult(card)
+            this._enqueueCard(card)
           }
         }
         this.collectBaseResults(bases, results, seen, index + 1, done)
@@ -912,7 +925,7 @@ export default {
             item.tag || next.tag || next.source
           )
           results.push(card)
-          this._emitResult(card)
+          this._enqueueCard(card)
         }
         nextIndex++
       }
@@ -1129,9 +1142,40 @@ export default {
     return best
   },
 
-  _emitResult(card) {
-    this.resultCards.push(card)
+  _enqueueCard(card) {
+    if (this._pendingCards.length >= 200) {
+      return
+    }
+    this._pendingCards.push(card)
+  },
+
+  _flushResults() {
+    if (this._pendingCards.length === 0) {
+      return
+    }
+    var remaining = 20 - this.resultCards.length
+    if (remaining <= 0) {
+      this._pendingCards = []
+      return
+    }
+    var batch = this._pendingCards.splice(0, remaining)
+    for (var i = 0; i < batch.length; i++) {
+      this.resultCards.push(batch[i])
+    }
     this.resultCards = this.resultCards.slice()
+  },
+
+  _startFlushTimer() {
+    this._stopFlushTimer()
+    var self = this
+    this._flushTimer = setInterval(function () { self._flushResults() }, 1000)
+  },
+
+  _stopFlushTimer() {
+    if (this._flushTimer) {
+      clearInterval(this._flushTimer)
+      this._flushTimer = null
+    }
   },
 
   createResultCard(id, word, phonetic, translation, tag) {
@@ -1319,6 +1363,7 @@ export default {
 
   onDestroy() {
     this.destroyed = true
+    this._stopFlushTimer()
     this.fileCache = null
     this.entryCache = null
     this.cnIndexCache = null
