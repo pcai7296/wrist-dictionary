@@ -422,21 +422,21 @@ export default {
       return 0
     }
     if (ch >= "\u4e00" && ch <= "\u9fff") {
-      return 15
+      return 20
     }
     if (ch >= "A" && ch <= "Z") {
-      return 9
+      return 12
     }
     if (ch >= "a" && ch <= "z") {
-      return 8
+      return 11
     }
     if (ch >= "0" && ch <= "9") {
-      return 8
+      return 11
     }
     if (ch === " " || ch === "." || ch === "," || ch === ";" || ch === ":" || ch === "/" || ch === "-") {
-      return 5
+      return 7
     }
-    return 9
+    return 12
   },
 
   normalizeWord(value) {
