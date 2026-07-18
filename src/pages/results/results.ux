@@ -19,7 +19,13 @@
         tid="id"
         style="width: {{cardWidth}}px; height: {{ item.itemHeight }}px;"
       >
-        <div class="result-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openDetail(item)">
+        <div if="{{ item.recordKind === 'next-page' }}" class="next-button" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="_goToNextPage">
+          <text class="next-text">下一页</text>
+        </div>
+        <div elif="{{ item.recordKind === 'prev-page' }}" class="next-button" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="_goToPrevPage">
+          <text class="next-text">上一页</text>
+        </div>
+        <div else class="result-card" style="width: {{cardWidth}}px; height: {{ item.cardHeight }}px;" @click="openDetail(item)">
           <div class="result-head">
             <text if="{{ !item.wordMarqueeOn }}" class="result-word">{{ item.word }}</text>
             <text if="{{ item.wordMarqueeOn && !marqueeArmed }}" class="result-word">{{ item.word }}</text>
@@ -43,6 +49,7 @@
 
 <script>
 import router from "@system.router"
+import storage from "@system.storage"
 import file from "@system.file"
 import prompt from "@system.prompt"
 import {decodeDeltaIds, decodePrefixField, parseBase36} from "../../common/dictCodec"
@@ -129,8 +136,12 @@ export default {
     queryMarqueeSpeed: 40,
     wordMarqueeThreshold: 0,
     marqueeArmed: false,
-    _pendingCards: [],
-    _flushTimer: null
+    pendingCards: [],
+    flushTimer: null,
+    historyCache: null,
+    searchPage: 0,
+    collectedIds: [],
+    totalResultCount: 0
   },
 
   _expandTag(s) {
@@ -270,10 +281,38 @@ export default {
     const token = this.searchToken + 1
     this.searchToken = token
     this.resultCards = []
-    this._pendingCards = []
+    this.pendingCards = []
     this.statusText = "搜索中"
+    this.searchPage = 0
+    this.collectedIds = []
+    this.totalResultCount = 0
     this._startFlushTimer()
 
+    var self = this
+    storage.get({
+      key: "dic_history",
+      success: function(data) {
+        if (token !== self.searchToken) return
+        var list = self._parseHistoryList(data)
+        for (var i = 0; i < list.length; i++) {
+          var entry = list[i]
+          if (entry.query === normalized && entry.ids && entry.ids.length > 0) {
+            self.historyCache = list
+            self._hydrateFromCachedIds(entry.ids, token)
+            return
+          }
+        }
+        self.historyCache = list
+        self._startNormalSearch(normalized, token)
+      },
+      fail: function() {
+        self.historyCache = []
+        self._startNormalSearch(normalized, token)
+      }
+    })
+  },
+
+  _startNormalSearch(normalized, token) {
     if (this.hasChinese(normalized)) {
       if (normalized.length === 1) {
         // Single character — skip cn_index (multi-character phrases only)
@@ -288,7 +327,15 @@ export default {
         this._stopFlushTimer()
         this.marqueeArmed = true
         if (this.resultCards.length > 0) {
-          this.statusText = this.resultCards.length >= 20 ? "最多显示20条" : ""
+          this._saveSearchHistory()
+          if (this.resultCards.length >= 20) {
+            this._collectExtraEnglishIds(normalized, () => {
+              this._finalizeAfterSearch()
+            })
+          } else {
+            this.totalResultCount = this.resultCards.length
+            this._finalizeAfterSearch()
+          }
         } else {
           this.performChineseSearch(normalized, token)
         }
@@ -328,6 +375,81 @@ export default {
     })
   },
 
+  _hydrateFromCachedIds(ids, token) {
+    var self = this
+    var idList = ids.slice(0, 20)
+    var groups = {}
+    for (var i = 0; i < idList.length; i++) {
+      var entryId = parseInt(idList[i], 10)
+      if (!isNaN(entryId) && entryId >= 0) {
+        var shard = this.entryShardFor(entryId)
+        if (!groups[shard]) {
+          groups[shard] = []
+        }
+        if (groups[shard].length < 20) {
+          groups[shard].push(entryId)
+        }
+      }
+    }
+
+    var shardKeys = Object.keys(groups)
+    var shardIdx = 0
+
+    function loadNext() {
+      if (shardIdx >= shardKeys.length || token !== self.searchToken) {
+        done()
+        return
+      }
+
+      var shard = parseInt(shardKeys[shardIdx], 10)
+      var idsInShard = groups[shardKeys[shardIdx]]
+      shardIdx++
+
+      self.loadEntryShard(shard, function(entries) {
+        if (token !== self.searchToken) return
+        var seen = {}
+        for (var i = 0; i < self.resultCards.length; i++) {
+          seen[self.resultCards[i].id] = true
+        }
+        for (var j = 0; j < idsInShard.length; j++) {
+          var entryId = idsInShard[j]
+          var item = entries[entryId]
+          if (item) {
+            var lower = self.normalizeWord(item.word)
+            if (!seen[lower] && self.resultCards.length < 20) {
+              seen[lower] = true
+              var card = self.createResultCard(entryId, lower, item.word, item.phonetic, item.translation, item.tag || "")
+              self.resultCards.push(card)
+              self._enqueueCard(card)
+            }
+          }
+        }
+        loadNext()
+      })
+    }
+
+    function done() {
+      self._flushResults()
+      self._stopFlushTimer()
+      self.marqueeArmed = true
+      if (self.resultCards.length === 0) {
+        self.statusText = "未找到"
+      } else if (self.resultCards.length >= 20) {
+        self._collectExtraEnglishIds(self.queryText, () => {
+          self._finalizeAfterSearch()
+        })
+        return
+      } else {
+        self.totalResultCount = self.resultCards.length
+        self._finalizeAfterSearch()
+        return
+      }
+      self._appendNextButton()
+    }
+
+    loadNext()
+  },
+
   finishEnglishSearch(query, token) {
     if (this.resultCards.length === 0 && query.length > 2 && this.searchMode !== "inflect" && this.isEnglishWord(query)) {
       this.showToast("未找到，混淆搜索")
@@ -341,10 +463,9 @@ export default {
         this.marqueeArmed = true
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
-        } else if (this.resultCards.length >= 20) {
-          this.statusText = "相近结果20条"
         } else {
-          this.statusText = "相近结果"
+          this._saveSearchHistory()
+          this._finishWithStatus("相近结果")
         }
       })
       return
@@ -356,10 +477,17 @@ export default {
     if (this.resultCards.length === 0) {
       this.statusText = "未找到"
     } else if (this.resultCards.length >= 20) {
-      this.statusText = "最多显示20条"
+      this._collectExtraEnglishIds(query, () => {
+        this._finalizeAfterSearch()
+      })
+      return
     } else {
-      this.statusText = ""
+      this.totalResultCount = this.resultCards.length
+      this._finalizeAfterSearch()
+      return
     }
+    this._saveSearchHistory()
+    this._appendNextButton()
   },
 
   performChineseSearch(query, token) {
@@ -388,10 +516,17 @@ export default {
         if (this.resultCards.length === 0) {
           this.statusText = "未找到"
         } else if (this.resultCards.length >= 20) {
-          this.statusText = "最多显示20条"
+          this._collectExtraChineseIds(ids, () => {
+            this._finalizeAfterSearch()
+          })
+          return
         } else {
-          this.statusText = ""
+          this.totalResultCount = this.resultCards.length
+          this._finalizeAfterSearch()
+          return
         }
+        this._saveSearchHistory()
+        this._appendNextButton()
       })
     })
   },
@@ -443,7 +578,7 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower] && this.normalizeChineseText(item.translation).indexOf(query) >= 0) {
             seen[lower] = true
-            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
+            const card = this.createResultCard(nextId, lower, item.word, item.phonetic, item.translation, item.tag)
             results.push(card)
             this._enqueueCard(card)
           }
@@ -551,7 +686,7 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower]) {
             seen[lower] = true
-            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, item.tag)
+            const card = this.createResultCard(nextId, lower, item.word, item.phonetic, item.translation, item.tag)
             results.push(card)
             this._enqueueCard(card)
           }
@@ -734,7 +869,7 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower]) {
             seen[lower] = true
-            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
+            const card = this.createResultCard(form, lower, item.word, item.phonetic, item.translation, "变形")
             results.push(card)
             this._enqueueCard(card)
           }
@@ -796,6 +931,7 @@ export default {
               const item = entries[entryId]
               if (item) {
                 const card = this.createResultCard(
+                  entryId,
                   this.normalizeWord(displayWord),
                   displayWord,
                   item.phonetic,
@@ -831,7 +967,7 @@ export default {
           const lower = this.normalizeWord(item.word)
           if (!seen[lower]) {
             seen[lower] = true
-            const card = this.createResultCard(lower, item.word, item.phonetic, item.translation, "变形")
+            const card = this.createResultCard(base, lower, item.word, item.phonetic, item.translation, "变形")
             results.push(card)
             this._enqueueCard(card)
           }
@@ -919,6 +1055,7 @@ export default {
         const item = entries[next.entryId]
         if (item) {
           const card = this.createResultCard(
+            next.entryId,
             next.lower,
             item.word || next.word,
             item.phonetic,
@@ -1144,22 +1281,22 @@ export default {
   },
 
   _enqueueCard(card) {
-    if (this._pendingCards.length >= 200) {
+    if (this.pendingCards.length >= 200) {
       return
     }
-    this._pendingCards.push(card)
+    this.pendingCards.push(card)
   },
 
   _flushResults() {
-    if (this._pendingCards.length === 0) {
+    if (this.pendingCards.length === 0) {
       return
     }
     var remaining = 20 - this.resultCards.length
     if (remaining <= 0) {
-      this._pendingCards = []
+      this.pendingCards = []
       return
     }
-    var batch = this._pendingCards.splice(0, remaining)
+    var batch = this.pendingCards.splice(0, remaining)
     for (var i = 0; i < batch.length; i++) {
       this.resultCards.push(batch[i])
     }
@@ -1169,17 +1306,291 @@ export default {
   _startFlushTimer() {
     this._stopFlushTimer()
     var self = this
-    this._flushTimer = setInterval(function () { self._flushResults() }, 1000)
+    this.flushTimer = setInterval(function () { self._flushResults() }, 1000)
   },
 
   _stopFlushTimer() {
-    if (this._flushTimer) {
-      clearInterval(this._flushTimer)
-      this._flushTimer = null
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer)
+      this.flushTimer = null
     }
   },
 
-  createResultCard(id, word, phonetic, translation, tag) {
+  _parseHistoryList(data) {
+    if (!data) {
+      return []
+    }
+    var text = data.value || data || ""
+    if (!text) {
+      return []
+    }
+    try {
+      var list = JSON.parse(text)
+      if (list && list.length) {
+        return list
+      }
+    } catch (e) {}
+    return []
+  },
+
+  _saveSearchHistory() {
+    var query = this.queryText
+    if (!query) {
+      return
+    }
+
+    var ids = []
+    var cards = this.resultCards || []
+    for (var i = 0; i < cards.length; i++) {
+      var entryId = parseInt(cards[i].entryId, 10)
+      if (!isNaN(entryId) && entryId >= 0) {
+        ids.push(entryId)
+      }
+    }
+
+    var self = this
+    storage.get({
+      key: "dic_history",
+      success: function(data) {
+        self._writeHistoryBlock(data, query, ids)
+      },
+      fail: function() {
+        self._writeHistoryBlock(null, query, ids)
+      }
+    })
+  },
+
+  _writeHistoryBlock(data, query, ids) {
+    var list = this._parseHistoryList(data)
+    var item = {query: query}
+    if (ids.length > 0) {
+      item.ids = ids
+    }
+
+    var output = [item]
+    for (var i = 0; i < list.length && output.length < 20; i++) {
+      var oldItem = list[i]
+      if (oldItem && oldItem.query && this.normalizeWord(oldItem.query) !== query) {
+        output.push(oldItem)
+      }
+    }
+
+    this.historyCache = output
+
+    storage.set({
+      key: "dic_history",
+      value: JSON.stringify(output)
+    })
+  },
+
+  _appendNextButton() {
+    if (this.totalResultCount > 20 && this.resultCards.length > 0 && this.resultCards[this.resultCards.length - 1].recordKind !== "next-page") {
+      this.resultCards.push({
+        id: "next_page",
+        recordKind: "next-page",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+      this.resultCards = this.resultCards.slice()
+    }
+  },
+
+  _finalizeAfterSearch() {
+    // Merge first-20 entryIds into collectedIds for uniform page access
+    if (this.resultCards.length <= 0) return
+    var allIds = []
+    var seen = {}
+    for (var i = 0; i < this.resultCards.length; i++) {
+      var eid = this.resultCards[i].entryId
+      if (eid && !seen[eid]) {
+        seen[eid] = true
+        allIds.push(eid)
+      }
+    }
+    for (var i = 0; i < this.collectedIds.length; i++) {
+      if (!seen[this.collectedIds[i]]) {
+        seen[this.collectedIds[i]] = true
+        allIds.push(this.collectedIds[i])
+      }
+    }
+    this.collectedIds = allIds
+    this.totalResultCount = Math.min(allIds.length, 60)
+    this._updatePaginationStatus()
+    this._saveSearchHistory()
+    this._appendNextButton()
+  },
+
+  _finishWithStatus(baseStatus) {
+    if (this.resultCards.length >= 20) {
+      var self = this
+      this._collectExtraEnglishIds(this.queryText, function() {
+        self._finalizeAfterSearch()
+      })
+    } else {
+      this.totalResultCount = this.resultCards.length
+      this.statusText = baseStatus + " " + this.resultCards.length + "条"
+      this._saveSearchHistory()
+      this._appendNextButton()
+    }
+  },
+
+  _updatePaginationStatus() {
+    if (this.totalResultCount <= 20) {
+      this.statusText = "搜索结果" + this.resultCards.length + "条"
+    } else if (this.totalResultCount <= 60) {
+      this.statusText = "当前第" + (this.searchPage + 1) + "页，搜索结果一共" + this.totalResultCount + "条"
+    } else {
+      this.statusText = "当前第" + (this.searchPage + 1) + "页，最大显示60条"
+    }
+  },
+
+  _collectExtraEnglishIds(query, done) {
+    var first = query.charAt(0)
+    if (first < "a" || first > "z") {
+      done()
+      return
+    }
+    var self = this
+    this.readText("/common/dict/words/word_" + first + ".txt", function(text) {
+      if (!text || self.collectedIds.length >= 40) {
+        done()
+        return
+      }
+      var seen = {}
+      for (var i = 0; i < self.resultCards.length; i++) {
+        seen[self.resultCards[i].id] = true
+      }
+      var idSeen = {}
+      for (var i = 0; i < self.collectedIds.length; i++) {
+        idSeen[self.collectedIds[i]] = true
+      }
+      var prevWord = ""
+      var lines = text.split("\n")
+      var normalizedQuery = self.normalizeWord(query)
+      for (var i = 0; i < lines.length && self.collectedIds.length < 40; i++) {
+        var parts = lines[i].split("\t")
+        if (parts.length < 3) continue
+        var word = self._decodeWordPrefix(parts, prevWord)
+        prevWord = word
+        var lower = self.normalizeWord(word)
+        if (!lower || seen[lower]) continue
+        if (lower.indexOf(normalizedQuery) !== 0) continue
+        seen[lower] = true
+        var entryId = self.parseEntryId(parts[1])
+        if (entryId >= 0 && !idSeen[entryId]) {
+          idSeen[entryId] = true
+          self.collectedIds.push(entryId)
+        }
+      }
+      done()
+    })
+  },
+
+  _collectExtraChineseIds(ids, done) {
+    var seen = {}
+    for (var i = 0; i < this.resultCards.length; i++) {
+      seen[this.resultCards[i].entryId] = true
+    }
+    for (var i = 0; i < ids.length && this.collectedIds.length < 40; i++) {
+      var entryId = this.parseEntryId(ids[i])
+      if (entryId >= 0 && !seen[entryId]) {
+        seen[entryId] = true
+        this.collectedIds.push(entryId)
+      }
+    }
+    done()
+  },
+
+  _goToNextPage() {
+    this.searchPage++
+    this._loadAndRenderPage()
+  },
+
+  _goToPrevPage() {
+    this.searchPage--
+    this._loadAndRenderPage()
+  },
+
+  _loadAndRenderPage() {
+    var self = this
+    var pageSize = 20
+    var start = this.searchPage * pageSize
+    var end = Math.min(start + pageSize, this.totalResultCount)
+    var pageIds = this.collectedIds.slice(start, end)
+
+    var groups = {}
+    for (var i = 0; i < pageIds.length; i++) {
+      var shard = this.entryShardFor(pageIds[i])
+      if (!groups[shard]) groups[shard] = []
+      groups[shard].push(pageIds[i])
+    }
+
+    var shardKeys = Object.keys(groups)
+    var newCards = []
+    var shardIdx = 0
+    var wordSeen = {}
+
+    function loadNext() {
+      if (shardIdx >= shardKeys.length) {
+        self._buildPageView(newCards)
+        return
+      }
+      var shard = parseInt(shardKeys[shardIdx], 10)
+      var idsInShard = groups[shardKeys[shardIdx]]
+      shardIdx++
+      self.loadEntryShard(shard, function(entries) {
+        for (var j = 0; j < idsInShard.length; j++) {
+          var entryId = idsInShard[j]
+          var item = entries[entryId]
+          if (item) {
+            var lower = self.normalizeWord(item.word)
+            if (!wordSeen[lower]) {
+              wordSeen[lower] = true
+              var card = self.createResultCard(entryId, lower, item.word, item.phonetic, item.translation, item.tag || "")
+              newCards.push(card)
+            }
+          }
+        }
+        loadNext()
+      })
+    }
+
+    loadNext()
+  },
+
+  _buildPageView(cards) {
+    var pageCards = []
+    if (this.searchPage > 0) {
+      pageCards.push({
+        id: "prev_page",
+        recordKind: "prev-page",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+    }
+    for (var i = 0; i < cards.length; i++) {
+      pageCards.push(cards[i])
+    }
+    var nextStart = (this.searchPage + 1) * 20
+    if (nextStart < this.totalResultCount) {
+      pageCards.push({
+        id: "next_page",
+        recordKind: "next-page",
+        cardHeight: 56,
+        itemHeight: 66,
+        wordMarqueeOn: false,
+        wordMarqueeSpeed: 40
+      })
+    }
+    this.resultCards = pageCards
+    this._updatePaginationStatus()
+  },
+
+  createResultCard(entryId, id, word, phonetic, translation, tag) {
     // Decode phrase markers for display (IPA is stored as ASCII-safe encoding, used as-is)
     phonetic = phonetic || ""
     translation = this._decodePhrase(translation || "")
@@ -1197,6 +1608,7 @@ export default {
     const wordMarqueeSpeed = wordMarqueeOn ? this.calcCardWordMarqueeSpeed(word) : 40
 
     return {
+      entryId: entryId,
       id: id,
       word: word,
       phonetic: phonetic ? "/" + phonetic + "/" : "",
@@ -1542,7 +1954,7 @@ export default {
 }
 
 .status-text {
-  width: 168px;
+  width: 200px;
   height: 20px;
   margin-bottom: 4px;
   color: #7eaef8;
@@ -1553,6 +1965,20 @@ export default {
 .result-list {
   height: 388px;
   margin-bottom: 4px;
+}
+
+.next-button {
+  height: 56px;
+  border-radius: 20px;
+  background-color: #0b65ea;
+  justify-content: center;
+  align-items: center;
+}
+
+.next-text {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
 }
 
 .result-item {
