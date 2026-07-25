@@ -52,7 +52,7 @@ import router from "@system.router"
 import storage from "@system.storage"
 import file from "@system.file"
 import prompt from "@system.prompt"
-import {decodeDeltaIds, decodePrefixField, parseBase36} from "../../common/dictCodec"
+import {decodeChineseIndex, decodePrefixField, parseBase36} from "../../common/dictCodec"
 
 const FUZZY_SCAN_LIMIT = 4000
 const FUZZY_POOL_LIMIT = 80
@@ -545,16 +545,9 @@ export default {
     }
 
     const bucket = this.zhBucketFor(firstChar)
-    this.readText("/common/dict/zh_index/zh_" + bucket + ".txt", (text) => {
-      const lines = text.split("\n")
-      for (let i = 0; i < lines.length; i++) {
-        const parts = lines[i].split("\t")
-        if (parts.length >= 2 && parts[0] === firstChar) {
-          done(decodeDeltaIds(parts[1]))
-          return
-        }
-      }
-      done([])
+    this.readBinary("/common/dict/zh_index/zh_" + bucket + ".bin", (bytes) => {
+      const indexMap = decodeChineseIndex(bytes, "zh")
+      done(indexMap && indexMap[firstChar] ? indexMap[firstChar] : [])
     })
   },
 
@@ -603,21 +596,8 @@ export default {
       return
     }
 
-    this.readText("/common/dict/cn_index/cn_" + bucket + ".txt", (text) => {
-      const indexMap = {}
-      var prevPhrase = ""
-      const lines = text.split("\n")
-      for (let i = 0; i < lines.length; i++) {
-        const parts = lines[i].split("\t")
-        if (parts.length >= 2) {
-          var phrase = decodePrefixField(parts[0], prevPhrase)
-          if (phrase === null) {
-            continue
-          }
-          indexMap[phrase] = decodeDeltaIds(parts[1])
-          prevPhrase = phrase
-        }
-      }
+    this.readBinary("/common/dict/cn_index/cn_" + bucket + ".bin", (bytes) => {
+      const indexMap = decodeChineseIndex(bytes, "cn") || {}
       this.cnIndexCache.set(bucket, indexMap)
       done(indexMap)
     })
@@ -1857,6 +1837,29 @@ export default {
 
   zhBucketFor(ch) {
     return this.padHex(ch.charCodeAt(0) % 64)
+  },
+
+  readBinary(uri, done) {
+    const cached = this.fileCache.get(uri)
+    if (cached !== undefined) {
+      done(cached)
+      return
+    }
+    file.readArrayBuffer({
+      uri: uri,
+      success: (data) => {
+        if (this.destroyed) return
+        const bytes = data && data.buffer ? data.buffer : new Uint8Array(0)
+        this.fileCache.set(uri, bytes)
+        done(bytes)
+      },
+      fail: () => {
+        if (this.destroyed) return
+        const bytes = new Uint8Array(0)
+        this.fileCache.set(uri, bytes)
+        done(bytes)
+      }
+    })
   },
 
   cnBucketFor(ch) {

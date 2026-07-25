@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DICT_DIR = ROOT / "src" / "common" / "dict"
 sys.path.insert(0, str(ROOT))
 from scripts.generate_watch_dict import decode_delta_ids, decode_front_code
+from omo.dict_semantic_validator import read_binary_index
 
 # ── 上次用过的词 (排除这些) ──
 PREVIOUS_ENGLISH = {
@@ -133,6 +134,11 @@ for shard_file in sorted((DICT_DIR / "words").iterdir()):
 cn_index = {}
 for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
     if not cn_file.name.startswith("cn_"):
+        continue
+    if cn_file.suffix == ".bin":
+        cn_index[cn_file.stem.replace("cn_", "")] = {
+            key: list(value) for key, value in read_binary_index(cn_file, "cn_index").items()
+        }
         continue
     bucket_map = {}
     prev_phrase = ""

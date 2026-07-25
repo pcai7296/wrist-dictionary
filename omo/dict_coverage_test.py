@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DICT_DIR = ROOT / "src" / "common" / "dict"
 sys.path.insert(0, str(ROOT))
 from scripts.generate_watch_dict import decode_delta_ids as decode_v3_ids, decode_front_code
+from omo.dict_semantic_validator import read_binary_index
 
 
 class DictionaryFormatError(ValueError):
@@ -61,6 +62,11 @@ for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
     if not cn_file.name.startswith("cn_"):
         continue
     cn_bucket_count += 1
+    if cn_file.suffix == ".bin":
+        bucket_map = {key: list(value) for key, value in read_binary_index(cn_file, "cn_index").items()}
+        cn_phrase_total += len(bucket_map)
+        cn_index[cn_file.stem.replace("cn_", "")] = bucket_map
+        continue
     bucket_map = {}
     prev_phrase = ""
     with open(cn_file, "r", encoding="utf-8") as f:

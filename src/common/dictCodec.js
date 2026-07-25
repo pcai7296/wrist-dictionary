@@ -96,6 +96,104 @@ function decodeDeltaIds(value) {
   return ids
 }
 
+function readUleb128(bytes, offset, limit) {
+  let value = 0
+  let shift = 0
+  let index = offset
+  while (index < limit) {
+    const byte = bytes[index]
+    const payload = byte & 0x7f
+    if (shift > 53 || (shift === 53 && payload > 1)) {
+      return null
+    }
+    value += payload * Math.pow(2, shift)
+    index++
+    if (!(byte & 0x80)) {
+      return {value: value, offset: index}
+    }
+    shift += 7
+  }
+  return null
+}
+
+function decodeRawDeltaIds(bytes, start, end) {
+  const ids = []
+  let current = 0
+  let offset = start
+  while (offset < end) {
+    const decoded = readUleb128(bytes, offset, end)
+    if (!decoded) return []
+    current += decoded.value
+    if ((ids.length && current <= ids[ids.length - 1]) || current < 0 || current > 14941) return []
+    ids.push(current)
+    offset = decoded.offset
+  }
+  return offset === end && ids.length ? ids : []
+}
+
+function decodeUtf8(bytes, start, end) {
+  let result = ""
+  for (let i = start; i < end; ) {
+    const first = bytes[i]
+    if (first < 0x80) {
+      result += String.fromCharCode(first)
+      i++
+    } else if (first >= 0xc2 && first <= 0xdf && i + 1 < end && (bytes[i + 1] & 0xc0) === 0x80) {
+      result += String.fromCharCode(((first & 0x1f) << 6) | (bytes[i + 1] & 0x3f))
+      i += 2
+    } else if (first >= 0xe0 && first <= 0xef && i + 2 < end && (bytes[i + 1] & 0xc0) === 0x80 && (bytes[i + 2] & 0xc0) === 0x80) {
+      result += String.fromCharCode(((first & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f))
+      i += 3
+    } else {
+      return null
+    }
+  }
+  return result
+}
+
+function decodeChineseIndex(bytes, kind) {
+  const magic = kind === "cn" ? [87, 68, 67, 52] : [87, 68, 90, 52]
+  if (!bytes || bytes.length < 4) return null
+  for (let i = 0; i < 4; i++) if (bytes[i] !== magic[i]) return null
+  const indexMap = {}
+  let offset = 4
+  let previous = ""
+  while (offset < bytes.length) {
+    const first = readUleb128(bytes, offset, bytes.length)
+    if (!first) return null
+    offset = first.offset
+    let phrase = ""
+    if (kind === "cn") {
+      const suffixLength = readUleb128(bytes, offset, bytes.length)
+      if (!suffixLength || first.value > previous.length) return null
+      offset = suffixLength.offset
+      const suffixEnd = offset + suffixLength.value
+      if (suffixEnd > bytes.length) return null
+      const suffix = decodeUtf8(bytes, offset, suffixEnd)
+      if (suffix === null) return null
+      phrase = previous.slice(0, first.value) + suffix
+      offset = suffixEnd
+    } else {
+      const keyEnd = offset + first.value
+      if (keyEnd > bytes.length) return null
+      phrase = decodeUtf8(bytes, offset, keyEnd)
+      if (phrase === null) return null
+      offset = keyEnd
+    }
+    const payloadLength = readUleb128(bytes, offset, bytes.length)
+    if (!payloadLength) return null
+    offset = payloadLength.offset
+    const payloadEnd = offset + payloadLength.value
+    if (payloadEnd > bytes.length) return null
+    const ids = decodeRawDeltaIds(bytes, offset, payloadEnd)
+    if (!ids.length || indexMap[phrase]) return null
+    indexMap[phrase] = ids
+    previous = phrase
+    offset = payloadEnd
+  }
+  return indexMap
+}
+
 function parseInflectionValue(value) {
   if (typeof value !== "string" || !value) {
     return null
@@ -107,4 +205,4 @@ function parseInflectionValue(value) {
   return {word: value}
 }
 
-export {decodeDeltaIds, decodePrefixField, parseBase36, parseInflectionValue}
+export {decodeChineseIndex, decodeDeltaIds, decodePrefixField, parseBase36, parseInflectionValue}
