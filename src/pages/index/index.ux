@@ -2,7 +2,7 @@
   <div class="page page-{{screenProfile}}">
     <text class="title title-{{screenProfile}}">腕上词典</text>
 
-    <div class="icon-card icon-card-{{screenProfile}}">
+    <div class="icon-card icon-card-{{screenProfile}}" @click="goSettings">
       <img class="deco-icon deco-icon-{{screenProfile}}" src="/common/deco-icon.png" />
     </div>
 
@@ -109,6 +109,12 @@ export default {
   goSearch() {
     router.push({
       uri: "/pages/search"
+    })
+  },
+
+  goSettings() {
+    router.push({
+      uri: "/pages/settings"
     })
   },
 

@@ -1,8 +1,8 @@
 {
   "package": "com.watch.dic",
   "name": "腕上词典",
-  "versionName": "2.2.0",
-  "versionCode": 3,
+  "versionName": "2.3.0",
+  "versionCode": 4,
   "minPlatformVersion": 1000,
   "icon": "/common/logo.png",
   "deviceTypeList": [
@@ -59,6 +59,9 @@
       },
       "pages/filter": {
         "component": "filter"
+      },
+      "pages/settings": {
+        "component": "settings"
       }
     }
   }

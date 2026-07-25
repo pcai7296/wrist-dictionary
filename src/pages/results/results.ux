@@ -1,6 +1,6 @@
 <template>
   <div class="page" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
-    <div class="back-button" @click="goBack">
+    <div class="back-button" @click="goBack" ontouchstart="onBackButtonTouchStart" ontouchend="onBackButtonTouchEnd">
       <text class="back-text">返回</text>
     </div>
 
@@ -143,7 +143,10 @@ export default {
     collectedIds: [],
     totalResultCount: 0,
     mightHaveMore: false,
-    wrapCache: null
+    wrapCache: null,
+    resultLongPressHomeEnabled: true,
+    backLongPressTimer: null,
+    backLongPressTriggered: false
   },
 
   _expandTag(s) {
@@ -185,10 +188,11 @@ export default {
   },
 
   onInit() {
-    this.fileCache = new LRUCache(20)
-    this.entryCache = new LRUCache(10)
-    this.cnIndexCache = new LRUCache(20)
+    this.fileCache = new LRUCache(6)
+    this.entryCache = new LRUCache(6)
+    this.cnIndexCache = new LRUCache(3)
     this.wrapCache = {}
+    this.loadResultLongPressHomeSetting()
     // Force-reset result state — Vela may reuse page instance without re-init
     this.resultCards = []
     this.statusText = ""
@@ -209,6 +213,7 @@ export default {
   },
 
   onShow() {
+    this.loadResultLongPressHomeSetting()
     // Re-check query — Vela may reuse page instance without re-firing onInit
     const currentQuery = this.normalizeWord(this.query)
     if (currentQuery && currentQuery !== this.queryText) {
@@ -249,7 +254,49 @@ export default {
   },
 
   goBack() {
+    if (this.backLongPressTriggered) {
+      return
+    }
     router.back()
+  },
+
+  loadResultLongPressHomeSetting() {
+    storage.get({
+      key: "dic_result_long_press_home",
+      default: "1",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const value = data && (data.value || data)
+        this.resultLongPressHomeEnabled = value !== "0"
+      },
+      fail: (data, code) => {
+        console.log("results long press setting get failed: " + code)
+      }
+    })
+  },
+
+  onBackButtonTouchStart() {
+    if (!this.resultLongPressHomeEnabled || this.backLongPressTimer) {
+      return
+    }
+    this.backLongPressTriggered = false
+    this.backLongPressTimer = setTimeout(() => {
+      this.backLongPressTimer = null
+      if (this.destroyed || !this.resultLongPressHomeEnabled) {
+        return
+      }
+      this.backLongPressTriggered = true
+      router.replace({uri: "/pages/index"})
+    }, 650)
+  },
+
+  onBackButtonTouchEnd() {
+    if (this.backLongPressTimer) {
+      clearTimeout(this.backLongPressTimer)
+      this.backLongPressTimer = null
+    }
   },
 
   openDetail(item) {
@@ -263,7 +310,7 @@ export default {
         word: item.word,
         phonetic: item.rawPhonetic || "",
         translation: item.translation || "",
-        tag: item.rawTag || item.tag || "",
+        tag: item.fullTag || item.rawTag || item.tag || "",
         searchMode: this.searchMode || "",
         inflectDepth: this.inflectDepth || "0"
       }
@@ -325,7 +372,7 @@ export default {
         this.performChineseSearch(normalized, token)
         return
       }
-      this.collectCn2EnResults(normalized, [], {}, () => {
+      this.collectCn2EnResults(normalized, [], {}, token, () => {
         if (token !== this.searchToken) {
           return
         }
@@ -511,7 +558,7 @@ export default {
 
       const results = []
       const seen = {}
-      this.collectChineseResults(ids, normalizedQuery, results, seen, 0, () => {
+      this.collectChineseResults(ids, normalizedQuery, results, seen, 0, token, () => {
         if (token !== this.searchToken) {
           return
         }
@@ -558,20 +605,24 @@ export default {
     })
   },
 
-  collectChineseResults(ids, query, results, seen, index, done) {
-    if (index >= ids.length || this.resultCards.length >= 20) {
+  collectChineseResults(ids, query, results, seen, index, token, done) {
+    if (token !== this.searchToken || this.destroyed || index >= ids.length || this.resultCards.length >= 20) {
       done()
       return
     }
 
     const entryId = this.parseEntryId(ids[index])
     if (entryId < 0) {
-      this.collectChineseResults(ids, query, results, seen, index + 1, done)
+      this.collectChineseResults(ids, query, results, seen, index + 1, token, done)
       return
     }
 
     const shard = this.entryShardFor(entryId)
     this.loadEntryShard(shard, (entries) => {
+      if (token !== this.searchToken || this.destroyed) {
+        done()
+        return
+      }
       let nextIndex = index
       while (nextIndex < ids.length && this.resultCards.length < 20) {
         const nextId = this.parseEntryId(ids[nextIndex])
@@ -592,7 +643,7 @@ export default {
         nextIndex++
       }
 
-      this.collectChineseResults(ids, query, results, seen, nextIndex, done)
+      this.collectChineseResults(ids, query, results, seen, nextIndex, token, done)
     })
   },
 
@@ -623,7 +674,11 @@ export default {
     })
   },
 
-  collectCn2EnResults(query, results, seen, done) {
+  collectCn2EnResults(query, results, seen, token, done) {
+    if (token !== this.searchToken || this.destroyed) {
+      done(results)
+      return
+    }
     const firstChar = this.getFirstChineseChar(query)
     if (!firstChar) {
       done(results)
@@ -632,6 +687,10 @@ export default {
 
     const bucket = this.cnBucketFor(firstChar)
     this.loadCnIndex(bucket, (indexMap) => {
+      if (token !== this.searchToken || this.destroyed) {
+        done(results)
+        return
+      }
       let ids = indexMap[query]
 
       // Prefix match fallback: max 20 candidate keys, 10 IDs per key, 50 total
@@ -662,24 +721,28 @@ export default {
         return
       }
 
-      this.fetchEntriesByIds(ids, results, seen, 0, done)
+      this.fetchEntriesByIds(ids, results, seen, 0, token, done)
     })
   },
 
-  fetchEntriesByIds(ids, results, seen, index, done) {
-    if (index >= ids.length || this.resultCards.length >= 20) {
+  fetchEntriesByIds(ids, results, seen, index, token, done) {
+    if (token !== this.searchToken || this.destroyed || index >= ids.length || this.resultCards.length >= 20) {
       done(results)
       return
     }
 
     const entryId = this.parseEntryId(ids[index])
     if (entryId < 0) {
-      this.fetchEntriesByIds(ids, results, seen, index + 1, done)
+      this.fetchEntriesByIds(ids, results, seen, index + 1, token, done)
       return
     }
 
     const shard = this.entryShardFor(entryId)
     this.loadEntryShard(shard, (entries) => {
+      if (token !== this.searchToken || this.destroyed) {
+        done(results)
+        return
+      }
       let nextIndex = index
       while (nextIndex < ids.length && this.resultCards.length < 20) {
         const nextId = this.parseEntryId(ids[nextIndex])
@@ -700,7 +763,7 @@ export default {
         nextIndex++
       }
 
-      this.fetchEntriesByIds(ids, results, seen, nextIndex, done)
+      this.fetchEntriesByIds(ids, results, seen, nextIndex, token, done)
     })
   },
 
@@ -1409,7 +1472,7 @@ export default {
     var seen = {}
     for (var i = 0; i < this.resultCards.length; i++) {
       var eid = this.resultCards[i].entryId
-      if (eid && !seen[eid]) {
+      if (eid >= 0 && !seen[eid]) {
         seen[eid] = true
         allIds.push(eid)
       }
@@ -1652,6 +1715,7 @@ export default {
       translationLines: safeLines,
       tag: showTag ? bestTag : "",
       rawTag: bestTag,
+      fullTag: tag,
       cardHeight: cardHeight,
       itemHeight: cardHeight + 10,
       wordMarqueeOn: wordMarqueeOn,
@@ -1811,6 +1875,7 @@ export default {
 
   onDestroy() {
     this.destroyed = true
+    this.onBackButtonTouchEnd()
     this._stopFlushTimer()
     this.fileCache = null
     this.entryCache = null

@@ -8,7 +8,7 @@
       <list-item type="card" class="list-item" style="width: {{layoutWidth}}px; height: 250px;">
         <div class="app-card">
           <text class="app-name">腕上词典</text>
-          <text class="app-version">2.2.0</text>
+          <text class="app-version">2.3.0</text>
           <img class="deco-icon-about" src="/common/deco-icon-about.png" />
         </div>
       </list-item>
@@ -180,7 +180,9 @@ export default {
       "3. 结果卡片：点击查看完整释义",
       "4. 详情页：收藏词条，上限 150 条",
       "5. 收藏管理：字母筛选、分页浏览",
-      "6. 历史记录：自动缓存最近 20 条"
+      "6. 历史记录：自动缓存最近 20 条",
+      "7.快捷方式：结果列表页长按返回键返回主页",
+      "8.设置：首页点击腕上词典四字下方图标进入自定义设置"
     ]
     const lines = []
     for (let i = 0; i < items.length; i++) {

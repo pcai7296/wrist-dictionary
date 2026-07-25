@@ -43,9 +43,9 @@
 <script>
 import device from "@system.device"
 import router from "@system.router"
-import storage from "@system.storage"
 import prompt from "@system.prompt"
 import file from "@system.file"
+import storage from "@system.storage"
 import {setSuggestionSeed, setSuggestions} from "../../common/suggestionState"
 import {decodePrefixField} from "../../common/dictCodec"
 
@@ -100,8 +100,14 @@ export default {
     englishSuggestionCache: null,
     englishSuggestionParsed: null,
     englishSuggestionPending: null,
+    englishSuggestionOrder: null,
     englishSuggestionToken: 0,
+    englishSuggestionEnabled: true,
+    searchSwipeExitLocked: true,
+    searchSubmitLocked: false,
     _suggestionTimer: null,
+    autoSearchTimer: null,
+    marqueeTimer: null,
     tapTimes: [],
     marqueeActive: false,
     marqueeSpeed: 40
@@ -146,6 +152,9 @@ export default {
     this.englishSuggestionCache = {}
     this.englishSuggestionParsed = {}
     this.englishSuggestionPending = {}
+    this.englishSuggestionOrder = []
+    this.loadEnglishSuggestionSetting()
+    this.loadSearchSwipeExitSetting()
     const app = this.$app.$def
     this.applyScreenInfo(app.data)
     device.getInfo({
@@ -172,8 +181,9 @@ export default {
       this.autoSearchPending = true
       // 等待 InputMethod 异步初始化完成（ready 事件）后再跳转
       // timeout 兜底，防止 ready 事件过早/过晚触发
-      setTimeout(() => {
-        if (this.autoSearchPending) {
+      this.autoSearchTimer = setTimeout(() => {
+        this.autoSearchTimer = null
+        if (!this.destroyed && this.autoSearchPending) {
           this.autoSearchPending = false
           this.performSearch()
         }
@@ -201,20 +211,45 @@ export default {
 
   onDestroy() {
     this.destroyed = true
+    this.englishSuggestionToken++
+    if (this._suggestionTimer) {
+      clearTimeout(this._suggestionTimer)
+      this._suggestionTimer = null
+    }
+    if (this.autoSearchTimer) {
+      clearTimeout(this.autoSearchTimer)
+      this.autoSearchTimer = null
+    }
+    if (this.marqueeTimer) {
+      clearTimeout(this.marqueeTimer)
+      this.marqueeTimer = null
+    }
+    this.englishSuggestionCache = null
+    this.englishSuggestionParsed = null
+    this.englishSuggestionPending = null
+    this.englishSuggestionOrder = null
     this.stopMarquee()
+  },
+
+  onShow() {
+    this.searchSubmitLocked = false
+    this.loadEnglishSuggestionSetting()
+    this.loadSearchSwipeExitSetting()
   },
 
   onReady() {
     if (this.autoSearchPending) {
       this.autoSearchPending = false
+      if (this.autoSearchTimer) {
+        clearTimeout(this.autoSearchTimer)
+        this.autoSearchTimer = null
+      }
       this.performSearch()
     }
   },
 
   onBackPress() {
-    // Disable system swipe-back gesture — it conflicts with keyboard right-swipes
-    // Manual swipe-back via onTouchStart/onTouchEnd handles back navigation
-    return true
+    return this.searchSwipeExitLocked
   },
 
   toggleKeyboard() {
@@ -298,6 +333,9 @@ export default {
   },
 
   performSearch() {
+    if (this.searchSubmitLocked) {
+      return
+    }
     const normalized = this.normalizeWord(this.query)
     this.keyboardHidden = true
     this.refreshDisplay()
@@ -309,6 +347,7 @@ export default {
       return
     }
 
+    this.searchSubmitLocked = true
     router.push({
       uri: "/pages/results",
       params: {
@@ -360,53 +399,6 @@ export default {
     })
   },
 
-  saveSearchHistory(query) {
-    const item = {
-      query: query
-    }
-    storage.get({
-      key: "dic_history",
-      success: (data) => {
-        const list = this.parseList(data)
-        this.writeHistoryList(list, item)
-      },
-      fail: () => {
-        this.writeHistoryList([], item)
-      }
-    })
-  },
-
-  writeHistoryList(list, item) {
-    const output = [item]
-    for (let i = 0; i < list.length && output.length < 20; i++) {
-      const oldItem = list[i]
-      if (oldItem && oldItem.query && this.normalizeWord(oldItem.query) !== item.query) {
-        output.push(oldItem)
-      }
-    }
-    storage.set({
-      key: "dic_history",
-      value: JSON.stringify(output)
-    })
-  },
-
-  parseList(data) {
-    if (!data) {
-      return []
-    }
-    const text = data.value ? data.value : data
-    try {
-      const list = JSON.parse(text)
-      if (list && list.length) {
-        return list
-      }
-    } catch (err) {
-      console.log("[腕上词典] storage data parse failed:", err && err.message)
-      return []
-    }
-    return []
-  },
-
   onTouchStart(evt) {
     const point = this.getTouchPoint(evt)
     if (point) {
@@ -432,7 +424,7 @@ export default {
     // Keyboard visible → only trigger from above the keyboard (top ~35%)
     const validStartZone = this.keyboardHidden || this.touchStartY <= sh * 0.35
 
-    if (startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal && validStartZone) {
+    if (!this.searchSwipeExitLocked && startsInLeftQuarter && endsAtRightQuarter && mostlyHorizontal && validStartZone) {
       router.back()
     }
 
@@ -485,7 +477,12 @@ export default {
   startMarquee() {
     this.marqueeSpeed = this.calcMarqueeSpeed(this.query.length)
     this.displayText = this.query + "   " + this.query
-    setTimeout(() => {
+    if (this.marqueeTimer) {
+      clearTimeout(this.marqueeTimer)
+    }
+    this.marqueeTimer = setTimeout(() => {
+      this.marqueeTimer = null
+      if (this.destroyed) return
       const el = this.$element("marquee-text")
       if (el && el.start) {
         el.start()
@@ -494,6 +491,10 @@ export default {
   },
 
   stopMarquee() {
+    if (this.marqueeTimer) {
+      clearTimeout(this.marqueeTimer)
+      this.marqueeTimer = null
+    }
     const el = this.$element("marquee-text")
     if (el && el.stop) {
       el.stop()
@@ -513,6 +514,10 @@ export default {
   },
 
   refreshEnglishSuggestions(seed) {
+    if (!this.englishSuggestionEnabled) {
+      this.clearEnglishSuggestions()
+      return
+    }
     const normalized = this.normalizeEnglishSeed(seed)
     const suggestionToken = ++this.englishSuggestionToken
     if (!normalized) {
@@ -533,13 +538,11 @@ export default {
   scheduleSuggestionUpdate() {
     if (this._suggestionTimer) {
       clearTimeout(this._suggestionTimer)
+      this._suggestionTimer = null
     }
-    // Empty seed — clear suggestions immediately
-    if (!this.englishSeed) {
-      this.englishSuggestionToken++
-      this.englishSuggestionsText = ""
-      setSuggestionSeed("")
-      setSuggestions("")
+    // Disabled or empty seed — clear suggestions immediately
+    if (!this.englishSuggestionEnabled || !this.englishSeed) {
+      this.clearEnglishSuggestions()
       return
     }
     var self = this
@@ -552,6 +555,7 @@ export default {
   loadEnglishSuggestionSource(letter, done) {
     // Cache hit — use pre-parsed rows
     if (Object.prototype.hasOwnProperty.call(this.englishSuggestionParsed, letter)) {
+      this._touchEnglishSuggestion(letter)
       done(this.englishSuggestionParsed[letter])
       return
     }
@@ -559,17 +563,17 @@ export default {
     if (Object.prototype.hasOwnProperty.call(this.englishSuggestionCache, letter)) {
       var _rows = this.englishSuggestionCache[letter] || ""
       var _parsed = _rows ? this._parseSuggestionLines(_rows) : []
-      this.englishSuggestionParsed[letter] = _parsed
+      this._cacheEnglishSuggestion(letter, _parsed)
       delete this.englishSuggestionCache[letter]
       done(_parsed)
       return
     }
     if (this.englishSuggestionPending[letter]) {
-      this.englishSuggestionPending[letter] = done
+      this.englishSuggestionPending[letter].push(done)
       return
     }
 
-    this.englishSuggestionPending[letter] = done
+    this.englishSuggestionPending[letter] = [done]
 
     file.readText({
       uri: "/common/dict/words/word_" + letter + ".txt",
@@ -580,21 +584,92 @@ export default {
         }
         var text = data && data.text ? data.text : ""
         var parsed = text ? this._parseSuggestionLines(text) : []
-        this.englishSuggestionParsed[letter] = parsed
-        var pending = this.englishSuggestionPending[letter]
+        this._cacheEnglishSuggestion(letter, parsed)
+        var pending = this.englishSuggestionPending[letter] || []
         delete this.englishSuggestionPending[letter]
-        pending(parsed)
+        for (var i = 0; i < pending.length; i++) {
+          pending[i](parsed)
+        }
       },
       fail: () => {
         if (this.destroyed) {
           return
         }
-        this.englishSuggestionParsed[letter] = []
-        var pending = this.englishSuggestionPending[letter]
+        this._cacheEnglishSuggestion(letter, [])
+        var pending = this.englishSuggestionPending[letter] || []
         delete this.englishSuggestionPending[letter]
-        pending([])
+        for (var i = 0; i < pending.length; i++) {
+          pending[i]([])
+        }
       }
     })
+  },
+
+  loadEnglishSuggestionSetting() {
+    storage.get({
+      key: "dic_english_suggestions",
+      default: "1",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const value = data && (data.value || data)
+        this.englishSuggestionEnabled = value !== "0"
+        if (!this.englishSuggestionEnabled) {
+          this.clearEnglishSuggestions()
+        } else {
+          this.updateEnglishSeed()
+          this.scheduleSuggestionUpdate()
+        }
+      },
+      fail: (data, code) => {
+        console.log("search storage.get failed: " + code)
+      }
+    })
+  },
+
+  loadSearchSwipeExitSetting() {
+    storage.get({
+      key: "dic_search_swipe_exit_locked",
+      default: "1",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const value = data && (data.value || data)
+        this.searchSwipeExitLocked = value !== "0"
+      },
+      fail: (data, code) => {
+        console.log("search swipe setting get failed: " + code)
+      }
+    })
+  },
+
+  clearEnglishSuggestions() {
+    this.englishSuggestionToken++
+    if (this._suggestionTimer) {
+      clearTimeout(this._suggestionTimer)
+      this._suggestionTimer = null
+    }
+    this.englishSuggestionsText = ""
+    setSuggestionSeed("")
+    setSuggestions("")
+  },
+
+  _touchEnglishSuggestion(letter) {
+    var index = this.englishSuggestionOrder.indexOf(letter)
+    if (index >= 0) {
+      this.englishSuggestionOrder.splice(index, 1)
+    }
+    this.englishSuggestionOrder.push(letter)
+  },
+
+  _cacheEnglishSuggestion(letter, rows) {
+    this.englishSuggestionParsed[letter] = rows
+    this._touchEnglishSuggestion(letter)
+    while (this.englishSuggestionOrder.length > 3) {
+      delete this.englishSuggestionParsed[this.englishSuggestionOrder.shift()]
+    }
   },
 
   applyEnglishSuggestions(normalized, rows) {

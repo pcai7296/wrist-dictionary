@@ -1,0 +1,226 @@
+<template>
+  <div class="page page-{{screenProfile}}" ontouchstart="onTouchStart" ontouchend="onTouchEnd">
+    <div class="search-button" @click="goBack">
+      <text class="back-text">返回</text>
+    </div>
+
+    <div class="content">
+      <text class="setting-title">英文输入联想</text>
+      <switch
+        class="suggestion-switch"
+        checked="{{ englishSuggestionEnabled }}"
+        @change="onSuggestionChange"
+      ></switch>
+      <text class="setting-title result-home-title">结果页长按返回主页</text>
+      <switch
+        class="suggestion-switch"
+        checked="{{ resultLongPressHomeEnabled }}"
+        @change="onResultLongPressHomeChange"
+      ></switch>
+      <div class="search-swipe-title">
+        <text class="setting-title">搜索输入页</text>
+        <text class="setting-title">强制不可滑动退出</text>
+      </div>
+      <switch
+        class="suggestion-switch"
+        checked="{{ searchSwipeExitLocked }}"
+        @change="onSearchSwipeExitChange"
+      ></switch>
+    </div>
+  </div>
+</template>
+
+<script>
+import router from "@system.router"
+import storage from "@system.storage"
+
+export default {
+  private: {
+    englishSuggestionEnabled: true,
+    resultLongPressHomeEnabled: true,
+    searchSwipeExitLocked: true,
+    screenProfile: "pill-standard",
+    destroyed: false,
+    touchStartX: -1,
+    touchStartY: -1
+  },
+
+  onInit() {
+    this.screenProfile = this.$app.$def.data.screenProfile || "pill-standard"
+    storage.get({
+      key: "dic_english_suggestions",
+      default: "1",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const value = data && (data.value || data)
+        this.englishSuggestionEnabled = value !== "0"
+      },
+      fail: (data, code) => {
+        console.log("settings storage.get failed: " + code)
+      }
+    })
+    storage.get({
+      key: "dic_result_long_press_home",
+      default: "1",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const value = data && (data.value || data)
+        this.resultLongPressHomeEnabled = value !== "0"
+      },
+      fail: (data, code) => {
+        console.log("settings result long press get failed: " + code)
+      }
+    })
+    storage.get({
+      key: "dic_search_swipe_exit_locked",
+      default: "1",
+      success: (data) => {
+        if (this.destroyed) {
+          return
+        }
+        const value = data && (data.value || data)
+        this.searchSwipeExitLocked = value !== "0"
+      },
+      fail: (data, code) => {
+        console.log("settings search swipe get failed: " + code)
+      }
+    })
+  },
+
+  onDestroy() {
+    this.destroyed = true
+  },
+
+  goBack() {
+    router.back()
+  },
+
+  onSuggestionChange(evt) {
+    this.englishSuggestionEnabled = !!(evt && evt.checked)
+    this.saveSwitch("dic_english_suggestions", this.englishSuggestionEnabled)
+  },
+
+  onResultLongPressHomeChange(evt) {
+    this.resultLongPressHomeEnabled = !!(evt && evt.checked)
+    this.saveSwitch("dic_result_long_press_home", this.resultLongPressHomeEnabled)
+  },
+
+  onSearchSwipeExitChange(evt) {
+    this.searchSwipeExitLocked = !!(evt && evt.checked)
+    this.saveSwitch("dic_search_swipe_exit_locked", this.searchSwipeExitLocked)
+  },
+
+  saveSwitch(key, enabled) {
+    storage.set({
+      key: key,
+      value: enabled ? "1" : "0",
+      fail: (data, code) => {
+        console.log("settings storage.set failed: " + code)
+      }
+    })
+  },
+
+  onTouchStart(evt) {
+    const point = this.getTouchPoint(evt)
+    if (point) {
+      this.touchStartX = point.clientX
+      this.touchStartY = point.clientY
+    }
+  },
+
+  onTouchEnd(evt) {
+    const point = this.getTouchPoint(evt)
+    if (!point || this.touchStartX < 0) {
+      return
+    }
+    const endX = point.clientX
+    const endY = point.clientY
+    const screenWidth = this.$app.$def.data.screenWidth || 212
+    const horizontal = Math.abs(endY - this.touchStartY) <= 120
+    if (this.touchStartX <= screenWidth * 0.25 && endX >= screenWidth * 0.75 && horizontal) {
+      router.back()
+    }
+    this.touchStartX = -1
+    this.touchStartY = -1
+  },
+
+  getTouchPoint(evt) {
+    if (evt && evt.changedTouches && evt.changedTouches.length > 0) {
+      return evt.changedTouches[0]
+    }
+    if (evt && evt.touches && evt.touches.length > 0) {
+      return evt.touches[0]
+    }
+    return null
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 100%;
+  height: 100%;
+  padding-top: 24px;
+  background-color: #020813;
+  flex-direction: column;
+  align-items: center;
+}
+
+.search-button {
+  width: 78px;
+  height: 54px;
+  border-radius: 22px;
+  background-color: #0b65ea;
+  justify-content: center;
+  align-items: center;
+}
+
+.back-text {
+  width: 70px;
+  height: 30px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.content {
+  width: 100%;
+  margin-top: 50px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.setting-title {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.suggestion-switch {
+  width: 58px;
+  height: 32px;
+  margin-top: 20px;
+  thumb-color: #ffffff;
+  track-color: #0b65ea;
+}
+
+.result-home-title {
+  margin-top: 34px;
+}
+
+.search-swipe-title {
+  margin-top: 34px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-circle {
+  padding-top: 16px;
+}
+</style>
