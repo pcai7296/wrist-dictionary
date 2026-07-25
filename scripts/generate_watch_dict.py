@@ -1,5 +1,4 @@
 # noqa: SIZE_OK - existing generator is intentionally a single deterministic pipeline.
-import argparse
 import csv
 import base64
 import gzip
@@ -164,12 +163,6 @@ def write_txt(path, content):
         f.write(content)
 
 
-def write_binary(path, content):
-    """Write a compact binary dictionary shard."""
-    with open(path, "wb") as f:
-        f.write(content)
-
-
 # CC-CEDICT English stop words — words too generic to form useful zh→en mappings
 CC_STOP_WORDS = {
     "the", "this", "that", "these", "those", "a", "an", "is", "are",
@@ -267,10 +260,6 @@ def encode_uleb128(value):
 
 
 def encode_delta_ids(entry_ids):
-    return base64.urlsafe_b64encode(encode_raw_delta_ids(entry_ids)).decode("ascii").rstrip("=")
-
-
-def encode_raw_delta_ids(entry_ids):
     previous = 0
     encoded = bytearray()
     for position, entry_id in enumerate(entry_ids):
@@ -282,49 +271,7 @@ def encode_raw_delta_ids(entry_ids):
         previous = entry_id
     if not encoded:
         raise DictionaryFormatError("entry ID list must not be empty")
-    return bytes(encoded)
-
-
-def encode_length(value):
-    return encode_uleb128(value)
-
-
-def common_prefix_chars(value, previous):
-    limit = min(len(value), len(previous))
-    prefix = 0
-    while prefix < limit and value[prefix] == previous[prefix]:
-        prefix += 1
-    return prefix
-
-
-def encode_cn_bucket(rows):
-    """Encode front-coded UTF-8 phrases plus raw ULEB128 ID payloads."""
-    result = bytearray(b"WDC4")
-    previous = ""
-    for phrase, entry_ids in rows:
-        prefix = common_prefix_chars(phrase, previous)
-        suffix = phrase[prefix:].encode("utf-8")
-        payload = encode_raw_delta_ids(entry_ids)
-        result.extend(encode_length(prefix))
-        result.extend(encode_length(len(suffix)))
-        result.extend(suffix)
-        result.extend(encode_length(len(payload)))
-        result.extend(payload)
-        previous = phrase
-    return bytes(result)
-
-
-def encode_zh_bucket(rows):
-    """Encode UTF-8 characters plus raw ULEB128 ID payloads."""
-    result = bytearray(b"WDZ4")
-    for char, entry_ids in rows:
-        char_bytes = char.encode("utf-8")
-        payload = encode_raw_delta_ids(entry_ids)
-        result.extend(encode_length(len(char_bytes)))
-        result.extend(char_bytes)
-        result.extend(encode_length(len(payload)))
-        result.extend(payload)
-    return bytes(result)
+    return base64.urlsafe_b64encode(bytes(encoded)).decode("ascii").rstrip("=")
 
 
 def encode_rle(tokens):
@@ -650,10 +597,7 @@ def load_wordnet_derived_links(word_set):
     return stats
 
 
-def main(output_dir=None):
-    global OUT
-    if output_dir:
-        OUT = Path(output_dir).resolve()
+def main():
     rows = []
     with SOURCE.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -867,13 +811,15 @@ def main(output_dir=None):
     cn_link_count = 0
     for bucket_number in range(CN_BUCKET_COUNT):
         bucket = f"{bucket_number:02x}"
-        binary_rows = []
+        lines = []
+        prev_phrase = ""
         for phrase in sorted(cn_index.get(bucket, {})):
-            ids = sorted(cn_index[bucket][phrase])
-            binary_rows.append((phrase, ids))
+            ids = encode_delta_ids(sorted(cn_index[bucket][phrase]))
+            lines.append(encode_front_code(phrase, prev_phrase) + "\t" + ids)
             cn_phrase_count += 1
             cn_link_count += len(cn_index[bucket][phrase])
-        write_binary(OUT / "cn_index" / f"cn_{bucket}.bin", encode_cn_bucket(binary_rows))
+            prev_phrase = phrase
+        write_txt(OUT / "cn_index" / f"cn_{bucket}.txt", "\n".join(lines) + "\n")
 
     zh_char_count = 0
     zh_link_count = 0
@@ -881,24 +827,25 @@ def main(output_dir=None):
     for bucket_number in range(ZH_BUCKET_COUNT):
         bucket = f"{bucket_number:02x}"
         chars = zh_index.get(bucket, {})
-        binary_rows = []
+        lines = []
         for char, entry_ids in sorted(chars.items()):
-            binary_rows.append((char, sorted(entry_ids)))
+            encoded = encode_delta_ids(sorted(entry_ids))
+            lines.append(char + "\t" + encoded)
             zh_char_count += 1
             zh_link_count += len(entry_ids)
-        write_binary(OUT / "zh_index" / f"zh_{bucket}.bin", encode_zh_bucket(binary_rows))
+        write_txt(OUT / "zh_index" / f"zh_{bucket}.txt", "\n".join(lines) + "\n")
 
     stats = {
         "source": str(SOURCE),
         "headwords": len(rows),
-        "schema": "compact-v4",
+        "schema": "compact-v3",
         "wordIndexFormat": "base36PrefixLen+suffix\\tbase36EntryId\\ttagCode(hex)",
         "entriesFormat": "base36PrefixLen+wordSuffix\\tpron\\tdef\\t[tagCode]",
         "entriesEncoding": "implicit-eid, front-coded-word, ipa-mapped, phrase-encoded",
         "wordIndexFiles": len(word_indexes),
         "wordIndexEntries": len(rows),
         "wordShards": len(word_indexes),
-        "chineseIdEncoding": "raw-uleb128-delta",
+        "chineseIdEncoding": "base64url-uleb128-delta",
         "chineseIdOrdering": "strictly-increasing",
         "inflectShards": len(inflect),
         "inflectReverseShards": len(reverse_inflect),
@@ -924,8 +871,7 @@ def main(output_dir=None):
         "wordnetLinksAdded": wordnet_links_added,
         "entryShards": len(entry_shards),
         "entryShardSize": ENTRY_SHARD_SIZE,
-        "cnIndexFormat": "WDC4:uleb128CharPrefix+uleb128Suffix+utf8Suffix+uleb128Ids+rawUleb128Delta",
-        "zhIndexFormat": "WDZ4:uleb128Utf8Key+utf8Key+uleb128Ids+rawUleb128Delta",
+        "cnIndexFormat": "base36PrefixLen+suffix\\tbase64url-uleb128-delta",
         "inflectFormat": "base36PrefixLen+form\\tbase36EntryIds",
         "reverseInflectFormat": "base36PrefixLen+base\\t@base36EntryId-or-raw",
         "zhIndexRLE": False,
@@ -947,7 +893,4 @@ def main(output_dir=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output-dir")
-    args = parser.parse_args()
-    main(args.output_dir)
+    main()

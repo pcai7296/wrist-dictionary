@@ -69,76 +69,6 @@ def decode_delta_base64(value: str) -> list[int]:
     return result
 
 
-def decode_uleb128(payload: bytes, offset: int) -> tuple[int, int]:
-    value = 0
-    shift = 0
-    while offset < len(payload):
-        byte = payload[offset]
-        part = byte & 0x7F
-        if shift > 28 or (shift == 28 and part > 0x0F):
-            raise DictionaryValidationError("ULEB128 value exceeds 32 bits")
-        value |= part << shift
-        offset += 1
-        if not byte & 0x80:
-            return value, offset
-        shift += 7
-    raise DictionaryValidationError("truncated ULEB128 value")
-
-
-def decode_raw_delta_ids(payload: bytes) -> tuple[int, ...]:
-    ids: list[int] = []
-    current = 0
-    offset = 0
-    while offset < len(payload):
-        delta, offset = decode_uleb128(payload, offset)
-        current += delta
-        if ids and current <= ids[-1]:
-            raise DictionaryValidationError("decoded IDs must be strictly increasing")
-        ids.append(current)
-    if not ids:
-        raise DictionaryValidationError("empty ULEB128 ID list")
-    return tuple(ids)
-
-
-def read_binary_index(path: Path, directory: str) -> dict[str, tuple[int, ...]]:
-    payload = path.read_bytes()
-    expected_magic = b"WDC4" if directory == "cn_index" else b"WDZ4"
-    if not payload.startswith(expected_magic):
-        raise DictionaryValidationError(f"invalid binary index magic: {path.name}")
-    mappings: dict[str, tuple[int, ...]] = {}
-    previous = ""
-    offset = 4
-    while offset < len(payload):
-        first, offset = decode_uleb128(payload, offset)
-        if directory == "cn_index":
-            suffix_length, offset = decode_uleb128(payload, offset)
-            end = offset + suffix_length
-            if end > len(payload) or first > len(previous):
-                raise DictionaryValidationError(f"invalid binary phrase record: {path.name}")
-            try:
-                phrase = previous[:first] + payload[offset:end].decode("utf-8")
-            except UnicodeDecodeError as exc:
-                raise DictionaryValidationError(f"invalid UTF-8 phrase: {path.name}") from exc
-            offset = end
-        else:
-            end = offset + first
-            if end > len(payload):
-                raise DictionaryValidationError(f"invalid binary character record: {path.name}")
-            try:
-                phrase = payload[offset:end].decode("utf-8")
-            except UnicodeDecodeError as exc:
-                raise DictionaryValidationError(f"invalid UTF-8 character: {path.name}") from exc
-            offset = end
-        id_length, offset = decode_uleb128(payload, offset)
-        end = offset + id_length
-        if end > len(payload) or phrase in mappings:
-            raise DictionaryValidationError(f"invalid binary ID payload: {path.name}")
-        mappings[phrase] = decode_raw_delta_ids(payload[offset:end])
-        previous = phrase
-        offset = end
-    return mappings
-
-
 decode_delta_base36 = decode_delta_base64
 
 
@@ -218,15 +148,6 @@ def read_index(directory: str, prefix: str, *, compact: bool) -> tuple[dict[str,
 
     compact-v3: cn_index uses front-coded phrases and both indexes use Base64 ULEB128 IDs.
     """
-    binary_paths = sorted((DICT_DIR / directory).glob(f"{prefix}_*.bin"))
-    if binary_paths:
-        mappings: dict[str, tuple[int, ...]] = {}
-        for path in binary_paths:
-            decoded = read_binary_index(path, directory)
-            if set(decoded) & set(mappings):
-                raise DictionaryValidationError(f"duplicate binary index key: {path.name}")
-            mappings.update(decoded)
-        return mappings, sum(len(ids) for ids in mappings.values())
     decoder = decode_delta_base64 if compact else decode_legacy_ids
     mappings: dict[str, tuple[int, ...]] = {}
     link_count = 0
@@ -352,14 +273,14 @@ def validate(*, require_compact: bool) -> SemanticCounts:
         compact_checks = (
             (compact, "compact word index is missing"),
             (len(list((DICT_DIR / "words").glob("word_*.txt"))) == 26, "word shard count changed"),
-            (meta.get("schema") == "compact-v4", "compact schema marker changed"),
+            (meta.get("schema") == "compact-v3", "compact schema marker changed"),
             (
                 meta.get("wordIndexFormat") == "base36PrefixLen+suffix\\tbase36EntryId\\ttagCode(hex)",
                 "word index format changed",
             ),
-            (meta.get("chineseIdEncoding") == "raw-uleb128-delta", "Chinese ID encoding changed"),
-            (len(list((DICT_DIR / "cn_index").glob("cn_*.bin"))) == 96, "cn bucket count changed"),
-            (len(list((DICT_DIR / "zh_index").glob("zh_*.bin"))) == 64, "zh bucket count changed"),
+            (meta.get("chineseIdEncoding") == "base64url-uleb128-delta", "Chinese ID encoding changed"),
+            (len(list((DICT_DIR / "cn_index").glob("cn_*.txt"))) == 96, "cn bucket count changed"),
+            (len(list((DICT_DIR / "zh_index").glob("zh_*.txt"))) == 64, "zh bucket count changed"),
             (len(list((DICT_DIR / "inflect").glob("inflect_*.txt"))) == 26, "inflect shard count changed"),
             (len(list((DICT_DIR / "inflect_reverse").glob("ireverse_*.txt"))) == 26, "reverse inflect shard count changed"),
         )
@@ -383,11 +304,7 @@ def main() -> None:
     """Run the semantic validator from the command line."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-compact", action="store_true")
-    parser.add_argument("--dict-dir")
     args = parser.parse_args()
-    global DICT_DIR
-    if args.dict_dir:
-        DICT_DIR = Path(args.dict_dir).resolve()
     counts = validate(require_compact=args.require_compact)
     print(json.dumps(asdict(counts), ensure_ascii=False, sort_keys=True))
 

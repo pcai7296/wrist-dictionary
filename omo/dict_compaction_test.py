@@ -223,10 +223,12 @@ class SemanticValidatorRegressionTest(unittest.TestCase):
         # Given
         with tempfile.TemporaryDirectory() as temp_dir:
             dictionary = self.copy_dictionary(Path(temp_dir) / "dict")
-            cn_file = next((dictionary / "cn_index").glob("cn_*.bin"))
-            payload = bytearray(cn_file.read_bytes())
-            payload[4] = 0x80
-            cn_file.write_bytes(payload)
+            cn_file = next((dictionary / "cn_index").glob("cn_*.txt"))
+            rows = cn_file.read_text(encoding="utf-8").splitlines()
+            row_index = next(index for index, row in enumerate(rows) if row.split("\t", 1)[1])
+            phrase, encoded = rows[row_index].split("\t")
+            rows[row_index] = f"{phrase}\t!"
+            cn_file.write_text("\n".join(rows) + "\n", encoding="utf-8")
             meta_path = dictionary / "meta.json"
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta["cnIndexLinks"] -= 1

@@ -1,4 +1,4 @@
-"""Check compact-v4 dictionary sizes and acceptance gates."""
+"""Check compact-v3 dictionary sizes and acceptance gates."""
 
 import json
 from pathlib import Path
@@ -22,16 +22,16 @@ MAX_SCAN_ROWS = {
 
 
 def files_in(directory: Path) -> list[Path]:
-    return sorted(path for path in directory.iterdir() if path.suffix in (".txt", ".bin") and path.is_file())
+    return sorted(path for path in directory.glob("*.txt") if path.is_file())
 
 
 def main() -> None:
     meta = json.loads((DICT_DIR / "meta.json").read_text(encoding="utf-8"))
-    if meta.get("schema") != "compact-v4":
+    if meta.get("schema") != "compact-v3":
         raise SystemExit(f"schema gate failed: {meta.get('schema')!r}")
 
     total = 0
-    print("compact-v4 dictionary size report")
+    print("compact-v3 dictionary size report")
     for name, (expected_count, max_bytes) in EXPECTED.items():
         paths = files_in(DICT_DIR / name)
         size = sum(path.stat().st_size for path in paths)

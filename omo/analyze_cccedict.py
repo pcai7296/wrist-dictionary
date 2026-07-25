@@ -10,7 +10,6 @@ TEMP = os.environ["TEMP"]
 DICT_DIR = ROOT / "src" / "common" / "dict"
 sys.path.insert(0, str(ROOT))
 from scripts.generate_watch_dict import decode_front_code
-from omo.dict_semantic_validator import read_binary_index
 
 # ── 1. Parse CC-CEDICT ──
 CCEDICT_PATH = TEMP + "\\cedict.txt.gz"
@@ -80,9 +79,6 @@ print(f"Existing English words: {len(en_word_set)}")
 existing_cn_phrases = set()
 for cn_file in sorted((DICT_DIR / "cn_index").iterdir()):
     if not cn_file.name.startswith("cn_"):
-        continue
-    if cn_file.suffix == ".bin":
-        existing_cn_phrases.update(read_binary_index(cn_file, "cn_index"))
         continue
     with open(cn_file, "r", encoding="utf-8") as f:
         for line in f:
