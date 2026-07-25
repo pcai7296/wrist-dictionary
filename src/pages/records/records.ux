@@ -78,7 +78,9 @@ export default {
     listHeight: 388,
     allRecords: [],
     searchPage: 0,
-    totalRecordCount: 0
+    totalRecordCount: 0,
+    marqueeTimer: null,
+    pageScrollTimer: null
   },
 
   onInit() {
@@ -110,13 +112,27 @@ export default {
 
   onDestroy() {
     this.destroyed = true
+    if (this.marqueeTimer) {
+      clearTimeout(this.marqueeTimer)
+      this.marqueeTimer = null
+    }
+    if (this.pageScrollTimer) {
+      clearTimeout(this.pageScrollTimer)
+      this.pageScrollTimer = null
+    }
   },
 
   onShow() {
     this.loadRecords()
     // 1.5s 让人先看清单词，再齐步启动所有跑马灯
-    setTimeout(() => {
-      this.marqueeArmed = true
+    if (this.marqueeTimer) {
+      clearTimeout(this.marqueeTimer)
+    }
+    this.marqueeTimer = setTimeout(() => {
+      this.marqueeTimer = null
+      if (!this.destroyed) {
+        this.marqueeArmed = true
+      }
     }, 1500)
   },
 
@@ -270,7 +286,12 @@ export default {
     this.searchPage++
     this._buildPageView()
     var self = this
-    setTimeout(function() {
+    if (this.pageScrollTimer) {
+      clearTimeout(this.pageScrollTimer)
+    }
+    this.pageScrollTimer = setTimeout(function() {
+      self.pageScrollTimer = null
+      if (self.destroyed) return
       var list = self.$element("record-list")
       if (list && list.scrollTo) {
         list.scrollTo({index: 0})
@@ -282,7 +303,12 @@ export default {
     this.searchPage--
     this._buildPageView()
     var self = this
-    setTimeout(function() {
+    if (this.pageScrollTimer) {
+      clearTimeout(this.pageScrollTimer)
+    }
+    this.pageScrollTimer = setTimeout(function() {
+      self.pageScrollTimer = null
+      if (self.destroyed) return
       var list = self.$element("record-list")
       if (list && list.scrollTo) {
         list.scrollTo({index: self.recordItems.length - 1})
