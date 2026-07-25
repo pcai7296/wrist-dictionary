@@ -63,10 +63,11 @@ Run ash husky.sh once (requires git):
 `
 src/
   app.ux / manifest.json          — Entry + config
-  pages/                          — 7 pages
+  pages/                          — 8 pages
     index/                        — Home with 4 buttons
     search/                       — IME + cursor editing + autocomplete
     results/                      — English/Chinese results (1425 lines)
+    filter/                       — Letter drill-down jump-search
     detail/                       — Word detail + favorite toggle (661 lines)
     records/                      — History / favorites list (type param)
     about/                        — Credits, license, multi-screen adaptive usage text
@@ -76,7 +77,7 @@ src/
   common/
     dict/                         — Generated shards (gitignored, do NOT edit)
     icons/                        — Button/decoration icons
-    i18n/                         — Internationalization files
+  i18n/                           — Locale JSON files (defaults, en, zh-CN)
 scripts/                          — generate_watch_dict.py, deploy_watch.ps1
 omo/                              — 32 Python scripts for asset gen, poster, coverage tests
 data/                             — Source dict CSVs (ecdict_tagged_14942_compact.csv, cedict.txt.gz)
