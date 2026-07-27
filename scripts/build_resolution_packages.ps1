@@ -1,11 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 $targets = @(
-  @{ Id = "W192"; Width = 192; Script = "build:192" },
-  @{ Id = "W212"; Width = 212; Script = "build:212" },
-  @{ Id = "W336"; Width = 336; Script = "build:336" },
-  @{ Id = "W432"; Width = 432; Script = "build:432" },
-  @{ Id = "W466"; Width = 466; Script = "build:466" }
+  @{ Id = "W192"; Width = 192; Height = 490; Script = "build:192" },
+  @{ Id = "W212"; Width = 212; Height = 520; Script = "build:212" },
+  @{ Id = "W336"; Width = 336; Height = 336; Script = "build:336" },
+  @{ Id = "W432"; Width = 432; Height = 432; Script = "build:432" },
+  @{ Id = "W466"; Width = 466; Height = 466; Script = "build:466" }
 )
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -45,6 +45,7 @@ foreach ($target in $targets) {
   $manifest += [ordered]@{
     id = $target.Id
     width = $target.Width
+    height = $target.Height
     file = $name
     sha256 = $hash
     package = "com.watch.dic"

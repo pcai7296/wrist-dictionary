@@ -5,7 +5,7 @@ export default {
   data: {
     screenShape: buildTarget.shape,
     screenWidth: buildTarget.width,
-    screenHeight: buildTarget.width === 212 ? 520 : buildTarget.width === 466 ? 466 : 0,
+    screenHeight: buildTarget.height,
     screenAspectRatio: 0,
     screenProfile: buildTarget.profile,
     buildTargetId: buildTarget.id
