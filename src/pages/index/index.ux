@@ -42,27 +42,17 @@
 </template>
 
 <script>
-import device from "@system.device"
 import storage from "@system.storage"
 import router from "@system.router"
+import buildTarget from "../../common/buildTarget"
 
 export default {
   private: {
-    screenProfile: "pill-standard"
+    screenProfile: buildTarget.profile
   },
 
   onInit() {
-    const app = this.$app.$def
-    this.screenProfile = app.data.screenProfile || "pill-standard"
-    device.getInfo({
-      success: (data) => {
-        app.updateScreenInfo(data)
-        this.screenProfile = app.data.screenProfile
-      },
-      fail: (data, code) => {
-        console.log("index device.getInfo failed: " + code)
-      }
-    })
+    this.screenProfile = buildTarget.profile
     this._cleanInvalidHistory()
     this._trackLaunch()
   },
@@ -270,7 +260,7 @@ export default {
   font-weight: 800;
 }
 
-/* 启动时由 device.getInfo 选择档案，避免已知不兼容的 shape 媒体查询。 */
+/* 布局档案由条件编译固定，避免低 API 设备无法返回屏幕信息。 */
 .icon-card-pill-standard {
   display: flex;
   width: 98px;

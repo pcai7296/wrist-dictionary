@@ -323,9 +323,9 @@
 
 <script>
 import vibrator from "@system.vibrator";
-import device from '@system.device'
 import { SimpleInputMethod } from "./assets/dicUtil.js";
 import {getSuggestionSeed, getSuggestions, onSuggestionsChange} from "../../common/suggestionState"
+import buildTarget from "../../common/buildTarget"
 const KEY_MAPS = {
   full: [
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -414,8 +414,8 @@ export default {
     percent66: 0,
     // 针对screenShape为rect的设备，会自动获取screenWidth并绑定到根div
     // 这样便能同时适配n67和o65甚至是后续设备，但实际效果可能受designWidth影响
-    screenWidth: 212,
-    keyboardLeftOffset: 10, // (212 - 192) / 2, 由 adjustScreenWidth 更新
+    screenWidth: buildTarget.width,
+    keyboardLeftOffset: Math.max(0, (buildTarget.width - 192) / 2),
     keys: KEY_MAPS,
   },
   onInit() {
@@ -430,9 +430,9 @@ export default {
       }
       this.cvalList = tempCvalList;
     }
-    if (this.screentype === "rect" || this.screentype === "pill-shaped") {
-      this.adjustScreenWidth();
-    }
+    this.screenWidth = buildTarget.width
+    this.keyboardLeftOffset = Math.max(0, (buildTarget.width - 192) / 2)
+    this.$emit("ready", {})
     this.$watch("hide", "watchHidePropsChange");
     this.$watch("maxlength", "watchMaxLengthPropsChange");
     this.$watch("keyboardtype", "watchKeyboardTypePropsChange");
@@ -704,19 +704,6 @@ export default {
     }
     return output;
   },
-  adjustScreenWidth(){
-    device.getInfo({
-      success: (data) => {
-        this.screenWidth = data.screenWidth;
-        this.keyboardLeftOffset = Math.max(0, (data.screenWidth - 192) / 2);
-        this.$emit("ready", {});
-      },
-      fail: () => {
-        this.keyboardLeftOffset = Math.max(0, (this.screenWidth - 192) / 2);
-        this.$emit("ready", {});
-      }
-    })
-  }
 };
 </script>
 

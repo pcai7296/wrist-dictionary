@@ -1,65 +1,33 @@
 <script>
-import device from "@system.device"
+import buildTarget from "./common/buildTarget"
 
 export default {
   data: {
-    screenShape: "pill-shaped",
-    screenWidth: 212,
-    screenHeight: 520,
-    screenAspectRatio: 0.408,
-    screenProfile: "pill-standard"
-  },
-
-  updateScreenInfo(data) {
-    const appData = this.data
-    if (data.screenShape) {
-      appData.screenShape = data.screenShape
-    }
-    if (data.screenWidth) {
-      appData.screenWidth = data.screenWidth
-    }
-    if (data.screenHeight) {
-      appData.screenHeight = data.screenHeight
-    }
-    if (appData.screenHeight > 0) {
-      appData.screenAspectRatio =
-        Math.round((appData.screenWidth / appData.screenHeight) * 1000) / 1000
-    }
-
-    if (appData.screenShape === "circle") {
-      appData.screenProfile = "circle"
-    } else if (appData.screenShape === "rect") {
-      appData.screenProfile = "rect"
-    } else if (appData.screenAspectRatio <= 0.4) {
-      appData.screenProfile = "pill-compact"
-    } else {
-      appData.screenProfile = "pill-standard"
-    }
+    screenShape: buildTarget.shape,
+    screenWidth: buildTarget.width,
+    screenHeight: buildTarget.width === 212 ? 520 : buildTarget.width === 466 ? 466 : 0,
+    screenAspectRatio: 0,
+    screenProfile: buildTarget.profile,
+    buildTargetId: buildTarget.id
   },
 
   onCreate() {
     console.log("app created")
-    device.getInfo({
-      success: (data) => {
-        this.updateScreenInfo(data)
-        const appData = this.data
-        console.log(
-          "screen: shape=" +
-            appData.screenShape +
-            " width=" +
-            appData.screenWidth +
-            " height=" +
-            appData.screenHeight +
-            " ratio=" +
-            appData.screenAspectRatio +
-            " profile=" +
-            appData.screenProfile
-        )
-      },
-      fail: (data, code) => {
-        console.log("device.getInfo failed: " + code)
-      }
-    })
+    const appData = this.data
+    if (appData.screenHeight > 0) {
+      appData.screenAspectRatio =
+        Math.round((appData.screenWidth / appData.screenHeight) * 1000) / 1000
+    }
+    console.log(
+      "compiled screen target=" +
+        appData.buildTargetId +
+        " shape=" +
+        appData.screenShape +
+        " width=" +
+        appData.screenWidth +
+        " profile=" +
+        appData.screenProfile
+    )
   },
 
   onDestroy() {

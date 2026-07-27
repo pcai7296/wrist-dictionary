@@ -41,13 +41,13 @@
 </template>
 
 <script>
-import device from "@system.device"
 import router from "@system.router"
 import prompt from "@system.prompt"
 import file from "@system.file"
 import storage from "@system.storage"
 import {setSuggestionSeed, setSuggestions} from "../../common/suggestionState"
 import {decodePrefixField} from "../../common/dictCodec"
+import buildTarget from "../../common/buildTarget"
 
 const ENGLISH_SUFFIXES = [
   "s",
@@ -155,22 +155,7 @@ export default {
     this.englishSuggestionOrder = []
     this.loadEnglishSuggestionSetting()
     this.loadSearchSwipeExitSetting()
-    const app = this.$app.$def
-    this.applyScreenInfo(app.data)
-    device.getInfo({
-      success: (data) => {
-        app.updateScreenInfo(data)
-        this.applyScreenInfo(app.data)
-        this.maxLength = this.getMaxLength(
-          data.screenShape || app.data.screenShape,
-          Number(data.screenWidth || app.data.screenWidth || 212)
-        )
-        this.refreshDisplay()
-      },
-      fail: (data, code) => {
-        console.log("search device.getInfo failed: " + code)
-      }
-    })
+    this.applyScreenInfo(buildTarget)
     if (this.queryParam) {
       this.query = this.queryParam
       this.cursorIndex = this.query.length
@@ -192,10 +177,10 @@ export default {
   },
 
   applyScreenInfo(data) {
-    const screenShape = data.screenShape || "pill-shaped"
-    const screenWidth = Number(data.screenWidth || 212)
+    const screenShape = data.shape || data.screenShape || "pill-shaped"
+    const screenWidth = Number(data.width || data.screenWidth || 212)
     this.screenType = screenShape
-    this.screenProfile = data.screenProfile || "pill-standard"
+    this.screenProfile = data.profile || data.screenProfile || "pill-standard"
     this.maxLength = this.getMaxLength(screenShape, screenWidth)
   },
 

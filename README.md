@@ -85,6 +85,16 @@ npm run deploy:watch
 # 推送到真机
 npm run deploy:watch -- -Serial 192.168.x.x:5555
 
+### 多分辨率安装包
+
+项目通过条件编译生成五个目标包：192、212、336、432、466 像素宽度。
+
+```powershell
+npm run build:resolutions
+```
+
+产物位于 `dist/resolutions/`，其中 `manifest.json` 记录每个包的目标宽度和 SHA-256。安装时请根据设备屏幕宽度选择对应的 `.rpk`。
+
 # 仅推送已有 RPK，跳过构建
 npm run deploy:watch:fast
 ```
