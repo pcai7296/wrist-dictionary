@@ -10,7 +10,11 @@
         {{ wordText }}   {{ wordText }}
       </marquee>
       <text if="{{ !wordMarqueeOn }}" class="word-text" style="width: {{contentWidth}}px;">{{ wordText }}</text>
-      <text class="phonetic-text" style="width: {{contentWidth}}px;">{{ phoneticText }}</text>
+      <marquee if="{{ phoneticMarqueeOn }}" class="phonetic-marquee" style="width: {{contentWidth}}px;"
+        scrollamount="{{ phoneticMarqueeSpeed }}" direction="left" loop="-1" text-offset="40">
+        {{ phoneticText }}   {{ phoneticText }}
+      </marquee>
+      <text if="{{ !phoneticMarqueeOn }}" class="phonetic-text" style="width: {{contentWidth}}px;">{{ phoneticText }}</text>
     </div>
 
     <div class="content-area">
@@ -33,19 +37,17 @@ import router from "@system.router"
 import storage from "@system.storage"
 import file from "@system.file"
 import prompt from "@system.prompt"
-import {decodePrefixField, parseBase36} from "../../common/dictCodec"
 
 var TAG_CODE_MAP = {z: 'zk', g: 'gk', '4': 'cet4', '6': 'cet6', k: 'ky', t: 'toefl', i: 'ielts', e: 'gre'}
 var TAG_LABELS = ['zk', 'gk', 'cet4', 'cet6', 'ky', 'ielts', 'toefl', 'gre']
+var MAX_PHONETIC_LENGTH = 94
 
-var IPA_DECODE_MAP = {
-  'a': '\u0259', 'r': '\u025a', 'e': '\u025b',
-  'i': '\u026a', "'": '\u02c8', ',': '\u02cc',
-  'A': '\u0251', 'U': '\u028a', 'S': '\u0283',
-  'Z': '\u0292', 'T': '\u03b8', 'D': '\u00f0',
-  'N': '\u014b', 'O': '\u0254', 'E': '\u00e6',
-  'R': '\u025c', '|': '\u02d0', 'Q': '\u0252',
-  'V': '\u028c', 'g': '\u0261'
+var IPA_SAFE_MAP = {
+  '\u0259': 'a', '\u04d9': 'a', '\u025a': 'r', '\u0454': 'e', '\u03b5': 'e',
+  '\u026a': 'i', '\u02c8': "'", '\u02cc': ',', '\u0251': 'A', '\u028a': 'U',
+  '\u0283': 'S', '\u0292': 'Z', '\u03b8': 'T', '\u00f0': 'D', '\u014b': 'N',
+  '\u0254': 'O', '\u00e6': 'E', '\u025b': 'e', '\u025c': 'R', '\u02d0': '|',
+  '\u0252': 'Q', '\u028c': 'V', '\u0261': 'g'
 }
 
 var PHRASE_DECODE_MAP = {
@@ -77,8 +79,6 @@ export default {
     contentWidth: 164,
     favoriteLabel: "收藏",
     fileCache: {},
-    sourceWord: "",
-    inflectForms: [],
     lastToastAt: 0,
     toastCooldown: 1500,
     lastInflectAt: 0,
@@ -90,7 +90,15 @@ export default {
     wordMarqueeOn: false,
     wordMarqueeSpeed: 40,
     wordMarqueeThreshold: 9,
-    wordAreaMarginLeft: 15
+    phoneticMarqueeOn: false,
+    phoneticMarqueeSpeed: 40,
+    wordAreaMarginLeft: 15,
+    bottomStyle: "",
+    inflectBtnStyle: "",
+    favoriteBtnStyle: "",
+    displayLines: [],
+    isRoundScreen: false,
+    isCapsule: false
   },
 
   _expandTag(s) {
@@ -109,13 +117,20 @@ export default {
     return s.split(',').map(function(c) { return TAG_CODE_MAP[c] || c }).filter(Boolean).join(' ')
   },
 
-  _decodeIpa(s) {
+  _normalizeIpa(s) {
     if (!s) return s
-    s = s.replace(/\r/g, '')
+    s = s.replace(/\r/g, '').slice(0, MAX_PHONETIC_LENGTH)
     var out = ''
     for (var i = 0; i < s.length; i++) {
       var ch = s.charAt(i)
-      out += IPA_DECODE_MAP[ch] || ch
+      var mapped = IPA_SAFE_MAP[ch]
+      if (mapped) {
+        out += mapped
+      } else if (ch.charCodeAt(0) < 128) {
+        out += ch
+      } else {
+        out += "?"
+      }
     }
     return out
   },
@@ -152,7 +167,8 @@ export default {
       this.favoriteBtnStyle = ""
     }
     this.wordText = this.word || ""
-    this.phoneticText = this.phonetic ? "/" + (this.phonetic || "") + "/" : ""
+    this.phoneticText = this.phonetic ? "/" + this._normalizeIpa(this.phonetic) + "/" : ""
+    this.applyPhoneticMarquee(this.phoneticText)
     this.translationText = this._decodePhrase(this.translation || "")
     this.tagText = this._expandTag(this.tag || "")
     this.wordMarqueeThreshold = this.resolveWordMarqueeThreshold(sw)
@@ -201,6 +217,17 @@ export default {
     }
   },
 
+  applyPhoneticMarquee(text) {
+    const width = this.measureTextWidth(text || "")
+    if (text && width > this.contentWidth) {
+      this.phoneticMarqueeOn = true
+      this.phoneticMarqueeSpeed = Math.max(40, Math.min(60, Math.round(40 + (width - this.contentWidth) / 12)))
+    } else {
+      this.phoneticMarqueeOn = false
+      this.phoneticMarqueeSpeed = 40
+    }
+  },
+
   goInflect() {
     if (!this.wordText) {
       return
@@ -225,20 +252,6 @@ export default {
         query: this.wordText,
         searchMode: "inflect",
         inflectDepth: "" + (depth + 1)
-      }
-    })
-  },
-
-  goInflectParam(queryWord) {
-    if (!queryWord) {
-      return
-    }
-    router.push({
-      uri: "/pages/results",
-      params: {
-        query: queryWord,
-        searchMode: this.searchMode || "",
-        inflectDepth: this.inflectDepth || "0"
       }
     })
   },
@@ -480,107 +493,6 @@ export default {
     })
   },
 
-  loadReverseInflectForms(base, currentWord, showSource) {
-    const revShard = this.keyFor(base)
-    this.readText("/common/dict/inflect_reverse/ireverse_" + revShard + ".txt", (revText) => {
-      if (!revText) {
-        return
-      }
-      const values = this.scanReverseInflect(revText, base)
-      this.resolveReverseInflectValues(values, currentWord, [], 0, (allForms) => {
-        if (allForms.length > 0) {
-          if (showSource) {
-            this.sourceWord = base
-          }
-          this.inflectForms = allForms.slice(0, 10)
-        }
-      })
-    })
-  },
-
-  scanReverseInflect(text, base) {
-    const lines = text.split("\n")
-    const values = []
-    let previous = ""
-    for (let i = 0; i < lines.length; i++) {
-      const parts = lines[i].split("\t")
-      if (parts.length < 2) {
-        continue
-      }
-      const word = decodePrefixField(parts[0], previous)
-      if (word === null) {
-        continue
-      }
-      previous = word
-      if (word !== base) {
-        continue
-      }
-      const encoded = parts[1].split(",")
-      for (let j = 0; j < encoded.length; j++) {
-        const value = encoded[j]
-        if (!value) {
-          continue
-        }
-        if (value.charAt(0) === "@") {
-          const entryId = parseBase36(value.slice(1))
-          if (entryId >= 0) {
-            values.push(entryId)
-          }
-        } else {
-          values.push(value)
-        }
-      }
-      break
-    }
-    return values
-  },
-
-  resolveReverseInflectValues(values, currentWord, output, index, done) {
-    if (index >= values.length || output.length >= 10) {
-      done(output)
-      return
-    }
-    const value = values[index]
-    if (typeof value === "string") {
-      if (value !== currentWord && output.indexOf(value) < 0) {
-        output.push(value)
-      }
-      this.resolveReverseInflectValues(values, currentWord, output, index + 1, done)
-      return
-    }
-    this.loadEntryWord(value, (word) => {
-      if (word && word !== currentWord && output.indexOf(word) < 0) {
-        output.push(word)
-      }
-      this.resolveReverseInflectValues(values, currentWord, output, index + 1, done)
-    })
-  },
-
-  loadEntryWord(entryId, done) {
-    const shard = this.entryShardFor(entryId)
-    this.readText("/common/dict/entries/entry_" + shard + ".txt", (text) => {
-      const lines = text.split("\n")
-      let previous = ""
-      const baseId = parseInt(shard, 10) * 500
-      for (let i = 0; i < lines.length; i++) {
-        const parts = lines[i].split("\t")
-        if (parts.length < 3) {
-          continue
-        }
-        const word = decodePrefixField(parts[0], previous)
-        if (word === null) {
-          continue
-        }
-        previous = word
-        if (baseId + i === entryId) {
-          done(word)
-          return
-        }
-      }
-      done("")
-    })
-  },
-
   onTouchStart(evt) {
     const point = this.getTouchPoint(evt)
     if (point) {
@@ -670,11 +582,17 @@ export default {
   text-overflow: clip;
 }
 
-.phonetic-text {
+.phonetic-text,
+.phonetic-marquee {
   height: 36px;
   color: #a9c8f6;
   font-size: 28px;
   text-align: left;
+}
+
+.phonetic-marquee {
+  lines: 1;
+  text-overflow: clip;
 }
 
 .content-area {
@@ -690,11 +608,11 @@ export default {
 }
 
 .meaning-item {
-  height: 32px;
+  height: 44px;
 }
 
 .meaning-line {
-  height: 32px;
+  height: 38px;
   margin-left: 10px;
   color: #e9f2ff;
   font-size: 27px;
@@ -703,7 +621,7 @@ export default {
 }
 
 .tag-line {
-  height: 34px;
+  height: 38px;
   margin-left: 10px;
   color: #6ba3e8;
   font-size: 28px;

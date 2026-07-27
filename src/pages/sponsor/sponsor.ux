@@ -5,6 +5,7 @@
     </div>
 
     <img class="sponsor-code" src="/common/sponsor-code.png" />
+    <text class="sponsor-caption">求喂饭</text>
   </div>
 </template>
 
@@ -96,4 +97,11 @@ export default {
   margin-top: 68px;
 }
 
+.sponsor-caption {
+  margin-top: 16px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+}
 </style>

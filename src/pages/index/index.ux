@@ -64,6 +64,36 @@ export default {
       }
     })
     this._cleanInvalidHistory()
+    this._trackLaunch()
+  },
+
+  _trackLaunch() {
+    storage.get({
+      key: "dic_launch_count",
+      default: "0",
+      success: (data) => {
+        var raw = data && (data.value || data)
+        var count = parseInt(raw, 10)
+        if (!isFinite(count) || count < 0) {
+          count = 0
+        }
+        var nextCount = count + 1
+        storage.set({
+          key: "dic_launch_count",
+          value: String(nextCount),
+          fail: (setData, code) => {
+            console.log("index launch count save failed: " + code)
+          }
+        })
+        if (nextCount === 1 || nextCount % 10 === 0) {
+          this.goSponsor()
+        }
+      },
+      fail: (getData, code) => {
+        console.log("index launch count read failed: " + code)
+        this.goSponsor()
+      }
+    })
   },
 
   _cleanInvalidHistory() {
