@@ -42,6 +42,7 @@
 </template>
 
 <script>
+import device from "@system.device"
 import storage from "@system.storage"
 import router from "@system.router"
 import buildTarget from "../../common/buildTarget"
@@ -52,7 +53,17 @@ export default {
   },
 
   onInit() {
+    const app = this.$app.$def
     this.screenProfile = buildTarget.profile
+    device.getInfo({
+      success: (data) => {
+        app.updateScreenInfo(data)
+        this.screenProfile = app.data.screenProfile
+      },
+      fail: (data, code) => {
+        console.log("index device.getInfo failed; using compiled target: " + code)
+      }
+    })
     this._cleanInvalidHistory()
     this._trackLaunch()
   },

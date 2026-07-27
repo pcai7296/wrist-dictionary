@@ -323,6 +323,7 @@
 
 <script>
 import vibrator from "@system.vibrator";
+import device from "@system.device"
 import { SimpleInputMethod } from "./assets/dicUtil.js";
 import {getSuggestionSeed, getSuggestions, onSuggestionsChange} from "../../common/suggestionState"
 import buildTarget from "../../common/buildTarget"
@@ -430,9 +431,7 @@ export default {
       }
       this.cvalList = tempCvalList;
     }
-    this.screenWidth = buildTarget.width
-    this.keyboardLeftOffset = Math.max(0, (buildTarget.width - 192) / 2)
-    this.$emit("ready", {})
+    this.adjustScreenWidth()
     this.$watch("hide", "watchHidePropsChange");
     this.$watch("maxlength", "watchMaxLengthPropsChange");
     this.$watch("keyboardtype", "watchKeyboardTypePropsChange");
@@ -703,6 +702,23 @@ export default {
       }
     }
     return output;
+  },
+  adjustScreenWidth() {
+    device.getInfo({
+      success: (data) => {
+        const width = Number(data && data.screenWidth)
+        if (width > 0) {
+          this.screenWidth = width
+          this.keyboardLeftOffset = Math.max(0, (width - 192) / 2)
+        }
+        this.$emit("ready", {})
+      },
+      fail: () => {
+        this.screenWidth = buildTarget.width
+        this.keyboardLeftOffset = Math.max(0, (buildTarget.width - 192) / 2)
+        this.$emit("ready", {})
+      }
+    })
   },
 };
 </script>

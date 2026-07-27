@@ -41,6 +41,7 @@
 </template>
 
 <script>
+import device from "@system.device"
 import router from "@system.router"
 import prompt from "@system.prompt"
 import file from "@system.file"
@@ -156,6 +157,17 @@ export default {
     this.loadEnglishSuggestionSetting()
     this.loadSearchSwipeExitSetting()
     this.applyScreenInfo(buildTarget)
+    const app = this.$app.$def
+    device.getInfo({
+      success: (data) => {
+        app.updateScreenInfo(data)
+        this.applyScreenInfo(app.data)
+        this.refreshDisplay()
+      },
+      fail: (data, code) => {
+        console.log("search device.getInfo failed; using compiled target: " + code)
+      }
+    })
     if (this.queryParam) {
       this.query = this.queryParam
       this.cursorIndex = this.query.length
