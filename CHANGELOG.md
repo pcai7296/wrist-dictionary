@@ -1,5 +1,13 @@
 # 更新日志
 
+## 2.3.1（2026年7月30日）—— 翻页修复 📖
+
+🐛 翻页修复
+
+修复 shard 文件路径 bug：`_loadAndRenderPage` 和 `_hydrateFromCachedIds` 中 shard 键被 `parseInt` 转成整数，导致拼接出 `entry_0.txt` 这类不存在的路径。翻第二页卡片空白、重搜显示"未找到"均因此修复。
+
+同步修复 `_hydrateFromCachedIds` 中卡片直接 push `resultCards` 又入队 `pendingCards` 可能导致重复的次级问题。
+
 ## 2.3.0（2026年7月25日）—— 自定义与防护 ⚙️
 
 ⚙️ 设置中心来了

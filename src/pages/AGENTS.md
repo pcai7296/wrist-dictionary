@@ -2,7 +2,7 @@
 
 ## Overview
 
-8 page modules for the wrist dictionary app. Each page is a self-contained .ux SFC.
+9 page modules for the wrist dictionary app. Each page is a self-contained .ux SFC.
 
 ## Structure
 
@@ -15,7 +15,8 @@ pages/
 ├── detail/      # Word detail + favorite toggle (661 lines, 1s cooldown)
 ├── records/     # History/favorites list (type param, 462 lines)
 ├── about/       # Credits, license — #000000 bg, text clipping known issue (367 lines)
-└── sponsor/     # Donation QR code (120 lines)
+├── sponsor/     # Donation QR code (120 lines)
+└── settings/    # User preferences (suggestion toggle, swipe lock)
 ```
 
 ## Where to Look
@@ -28,6 +29,7 @@ pages/
 | Edit word display | detail/ | Favorite toggle uses @system.storage |
 | Change home layout | index/ | 4 main buttons + 2 secondary |
 | List management | records/ | Accepts `type` param (history/favorites) |
+| User preferences | settings/ | Suggestion toggle, swipe lock, long-press home |
 
 ## Swipe-back gesture (every page)
 

@@ -33,19 +33,20 @@
 ```
 src/
   app.ux / manifest.json          — Entry + config
-  pages/                          — 7 pages
+  pages/                          — 9 pages
     index/                        — Home with 4 buttons
     search/                       — IME + cursor editing + autocomplete
     results/                      — English/Chinese results
+    filter/                       — Letter drill-down jump-search
     detail/                       — Word detail + favorite toggle
     records/                      — History / favorites list (type param)
     about/                        — Credits, license
     sponsor/                      — Donation QR code
+    settings/                     — User preferences (suggestion toggle, swipe lock)
   components/
     InputMethod/                  — English QWERTY keyboard
   common/
     dict/                         — Generated shards (gitignored, do NOT edit)
-    english_suggestions.js        — Letter-indexed word list by exam tag
 scripts/                          — generate_watch_dict.py, deploy_watch.ps1
 ```
 

@@ -16,7 +16,9 @@
 | .opencode/instructions/poster-qc.md | Poster generation + GLM-4V-Flash visual QA workflow |
 | .prettierrc.js | No semicolons, double quotes, no trailing commas, racketSpacing: false, printWidth 100, 2-space indent. .ux parsed as Vue |
 | .stylelintrc.js | Allows custom Vela CSS props + :blur pseudo-class |
-| commitlint.config.js | Conventional commits: ug, eat, ix, docs, style, efactor, 	est, chore, evert, merge |
+| commitlint.config.js | Conventional commits: ug, eat, ix, docs, style, 
+efactor, 	est, chore, 
+evert, merge |
 | .eslintignore | Ignores dist/, uild/, sign/, 
 ode_modules/ |
 | .gitignore | Also ignores dist/, uild/, sign/, src/common/dict/ (generated), .husky/, .codegraph/, .omo/ |
@@ -40,7 +42,8 @@ pm run deploy:watch | Build + ADB push to emulator-5554 |
 | 
 pm run deploy:watch:fast | ADB push only (skip build) |
 
-uild/ and dist/ are gitignored — outputs of spack v1.7.12 via iot-toolkit.
+uild/ and dist/ are gitignored — outputs of 
+spack v1.7.12 via iot-toolkit.
 
 ## Deploy
 
@@ -63,7 +66,7 @@ Run ash husky.sh once (requires git):
 `
 src/
   app.ux / manifest.json          — Entry + config
-  pages/                          — 8 pages
+  pages/                          — 9 pages
     index/                        — Home with 4 buttons
     search/                       — IME + cursor editing + autocomplete
     results/                      — English/Chinese results (1425 lines)
@@ -72,6 +75,7 @@ src/
     records/                      — History / favorites list (type param)
     about/                        — Credits, license, multi-screen adaptive usage text
     sponsor/                      — Donation QR code
+    settings/                     — User preferences (suggestion toggle, swipe lock)
   components/
     InputMethod/                  — English QWERTY keyboard (890 lines), sub-assets for layouts
   common/
@@ -105,7 +109,7 @@ Both via @system.storage. Dedup/toggle by normalized word.
 
 Features: system.router, system.vibrator, system.device, system.file, system.storage, system.prompt (toast).
 
-7 pages in manifest.json, entry = pages/index.
+9 pages in manifest.json, entry = pages/index.
 
 ## Dictionary (~128k Chinese phrases, 15k English headwords)
 
@@ -144,8 +148,10 @@ Copy pattern from any page except about. Needs getTouchPoint() + 	ouchStartX/Y.
 
 ## Router quirks
 
-- **records to search**: outer.replace (not push) with utoSearch="1"
-- **detail to results** (inflect): outer.replace (not push)
+- **records to search**: 
+outer.replace (not push) with utoSearch="1"
+- **detail to results** (inflect): 
+outer.replace (not push)
 - **Detail page**: 1s cooldown on inflect button, max 3 depth levels
 
 ## VSCode MCP

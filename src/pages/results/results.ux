@@ -454,8 +454,8 @@ export default {
         return
       }
 
-      var shard = parseInt(shardKeys[shardIdx], 10)
-      var idsInShard = groups[shardKeys[shardIdx]]
+      var shard = shardKeys[shardIdx]
+      var idsInShard = groups[shard]
       shardIdx++
 
       self.loadEntryShard(shard, function(entries) {
@@ -472,7 +472,6 @@ export default {
             if (!seen[lower] && self.resultCards.length < 20) {
               seen[lower] = true
               var card = self.createResultCard(entryId, lower, item.word, item.phonetic, item.translation, item.tag || "")
-              self.resultCards.push(card)
               self._enqueueCard(card)
             }
           }
@@ -1624,8 +1623,8 @@ export default {
         self._buildPageView(newCards, callback)
         return
       }
-      var shard = parseInt(shardKeys[shardIdx], 10)
-      var idsInShard = groups[shardKeys[shardIdx]]
+      var shard = shardKeys[shardIdx]
+      var idsInShard = groups[shard]
       shardIdx++
       self.loadEntryShard(shard, function(entries) {
         for (var j = 0; j < idsInShard.length; j++) {
