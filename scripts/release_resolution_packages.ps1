@@ -42,7 +42,7 @@ try {
       throw "No release RPK generated for $($target.Id)"
     }
 
-    $name = "com.watch.dic.release.2.3.0.$($target.Id.ToLowerInvariant()).rpk"
+    $name = "com.watch.dic.release.2.3.1.$($target.Id.ToLowerInvariant()).rpk"
     $destination = Join-Path $staging $name
     Copy-Item -LiteralPath $rpk.FullName -Destination $destination -Force
     $hash = ([System.BitConverter]::ToString($sha256.ComputeHash([System.IO.File]::ReadAllBytes($destination))) -replace "-", "").ToLowerInvariant()
@@ -53,7 +53,7 @@ try {
       file = $name
       sha256 = $hash
       package = "com.watch.dic"
-      version = "2.3.0"
+      version = "2.3.1"
       mode = "release"
     }
   }
